@@ -83,6 +83,16 @@ cp .env.example .env
 node db.js init
 ```
 
+If you want a non-root MySQL app user:
+
+```bash
+node db.js create-env mysql --database app_database --user devuser --password change_me
+cp .env.example .env
+node db.js init
+```
+
+If MySQL refuses the connection, the CLI asks whether to start the local `mysql` service. If MySQL rejects the username or password, the CLI asks whether to create or update that user and grant access to the configured database using `sudo mysql`.
+
 For PostgreSQL URLs, prefer `127.0.0.1` over `localhost` when you want TCP host/port behavior.
 
 ## Environment
@@ -109,6 +119,14 @@ sudo -u postgres psql
 
 If your server user cannot run that command, run the printed setup commands manually or adjust PostgreSQL roles yourself.
 
+When MySQL refuses a connection on the configured host and port, the CLI asks whether it should start the local `mysql` service.
+
+When MySQL returns `Access denied`, the CLI asks whether it should create or update that user, create the configured database, and grant privileges using:
+
+```bash
+sudo mysql
+```
+
 When an operation fails because a required table is missing, the CLI asks whether it should initialize the configured schema before retrying.
 
 ## Notes
@@ -124,6 +142,7 @@ When an operation fails because a required table is missing, the CLI asks whethe
 - If that URL points to MySQL and the client is missing, the CLI can still generate install commands.
 - The toolkit loads `.env`, `.env.local`, and `.ENV` if present.
 - PostgreSQL defaults to `schemas/postgres/schema.sql` and `schemas/postgres/update_schema.sql`.
+- MySQL defaults to `schemas/mysql/schema.sql` when that engine is active.
 - Set `DB_TOOLKIT_EMOJI=true` to enable emoji status markers in output.
 - `node db.js set postgres` generates `db-toolkit.manifest.json`.
 - `node db.js set postgres --url` uses the loaded `LOCAL_DATABASE_URL` or `DATABASE_URL` value.
