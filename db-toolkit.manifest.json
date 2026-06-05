@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "activeEngine": "postgres",
+  "connectionEnvName": "LOCAL_DATABASE_URL",
+  "databaseName": "gdfsgsa",
+  "schemaFile": "schemas/postgres/schema.sql",
+  "updateFile": "schemas/postgres/update_schema.sql",
+  "migrationsDir": "migrations",
+  "seedFile": "schemas/seed.sql",
+  "backupDir": "backups",
+  "notes": [
+    "Use LOCAL_DATABASE_URL in .env",
+    "PostgreSQL uses the pg driver for init and schema operations"
+  ]
+}
