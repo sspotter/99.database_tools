@@ -76,17 +76,17 @@ node db.js init
 MySQL:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y mysql-server default-mysql-client
+sudo apt-get update && sudo apt-get install -y mysql-server
 sudo systemctl enable --now mysql
 node db.js create-env mysql --database app_database --user root --password change_me
 cp .env.example .env
 node db.js init
 ```
 
-Some Ubuntu images install MariaDB instead of Oracle MySQL. In that case the service may be named `mariadb`:
+Some Ubuntu images use MariaDB instead of Oracle MySQL. Do not install MariaDB on top of conflicting `mysql-client` packages unless you intentionally want to switch stacks. On a clean MariaDB setup the service may be named `mariadb`:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y mariadb-server default-mysql-client
+sudo apt-get update && sudo apt-get install -y mariadb-server mariadb-client
 sudo systemctl enable --now mariadb
 ```
 
@@ -98,7 +98,7 @@ cp .env.example .env
 node db.js init
 ```
 
-If MySQL refuses the connection, the CLI asks whether to start a local MySQL-compatible service and tries `mysql`, `mysqld`, and `mariadb`. If none of those units exist, install `mysql-server` or `mariadb-server`. If MySQL rejects the username or password, the CLI asks whether to create or update that user and grant access to the configured database using `sudo mysql`.
+If MySQL refuses the connection, the CLI asks whether to start a local MySQL-compatible service and tries `mysql`, `mysqld`, and `mariadb`. If none of those units exist, install `mysql-server`. If MySQL rejects the username or password, the CLI asks whether to create or update that user and grant access to the configured database using `sudo mysql`.
 
 For PostgreSQL URLs, prefer `127.0.0.1` over `localhost` when you want TCP host/port behavior.
 
