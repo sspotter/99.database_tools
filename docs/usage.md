@@ -10,6 +10,7 @@ node db.js tables
 node db.js health
 node db.js scan
 node db.js install sqlite postgres mysql
+node db.js create-env postgres --database app_database --user postgres --password change_me
 ```
 
 ## Commands
@@ -27,6 +28,62 @@ node db.js install sqlite postgres mysql
 - `migrate [dir]`
 - `scan`
 - `install [tool...]`
+- `set [engine] [--url]`
+- `create-env [engine]`
+
+## Create env files
+
+Use `create-env` to generate a fresh `.env.example` and matching `db-toolkit.manifest.json` for the selected engine.
+
+```bash
+node db.js create-env sqlite
+node db.js create-env postgres --database app_database --user postgres --password change_me
+node db.js create-env mysql --database app_database --user root --password change_me
+node db.js create-env mssql --database app_database --user sa --password change_me
+```
+
+Supported flags:
+
+- `--database=<name>`
+- `--host=<host>` defaults to `127.0.0.1`
+- `--port=<port>`
+- `--user=<user>`
+- `--password=<password>`
+
+After generating the template on a server:
+
+```bash
+cp .env.example .env
+node db.js scan
+node db.js init
+```
+
+## Ubuntu database servers
+
+Installing `psql` or `mysql` only installs client tools. PostgreSQL and MySQL also need server packages running.
+
+PostgreSQL:
+
+```bash
+sudo apt-get update && sudo apt-get install -y postgresql postgresql-client
+sudo systemctl enable --now postgresql
+sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'change_me';"
+node db.js create-env postgres --database app_database --user postgres --password change_me
+cp .env.example .env
+node db.js init
+```
+
+MySQL:
+
+```bash
+sudo apt-get update && sudo apt-get install -y mysql-server default-mysql-client
+sudo systemctl enable --now mysql
+node db.js create-env mysql --database app_database --user root --password change_me
+cp .env.example .env
+node db.js init
+```
+
+For PostgreSQL URLs, prefer `127.0.0.1` over `localhost` when you want TCP host/port behavior.
 
 ## Environment
 
@@ -41,6 +98,18 @@ node db.js install sqlite postgres mysql
 - `DB_SEED_FILE`
 - `DB_BACKUP_DIR`
 - `DB_TOOLKIT_ASSUME_YES`
+
+## Recovery prompts
+
+When PostgreSQL returns `password authentication failed`, the CLI asks whether it should create or update the role from the local `postgres` admin account. This uses:
+
+```bash
+sudo -u postgres psql
+```
+
+If your server user cannot run that command, run the printed setup commands manually or adjust PostgreSQL roles yourself.
+
+When an operation fails because a required table is missing, the CLI asks whether it should initialize the configured schema before retrying.
 
 ## Notes
 
@@ -58,5 +127,6 @@ node db.js install sqlite postgres mysql
 - Set `DB_TOOLKIT_EMOJI=true` to enable emoji status markers in output.
 - `node db.js set postgres` generates `db-toolkit.manifest.json`.
 - `node db.js set postgres --url` uses the loaded `LOCAL_DATABASE_URL` or `DATABASE_URL` value.
+- `node db.js create-env postgres` writes a PostgreSQL `.env.example` and updates the manifest.
 - `node db.js install postgres` prints the install commands by default.
 - Add `--apply` only when you want the CLI to actually run installers.
