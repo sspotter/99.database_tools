@@ -114,6 +114,10 @@ function parseArgs(argv) {
       case '--file':
       case '--seed':
       case '--manager':
+      case '--host':
+      case '--port':
+      case '--user':
+      case '--password':
       case '--url':
         options[flag.slice(2)] = readValue();
         break;
@@ -140,6 +144,8 @@ function resolveCommand(name = 'help') {
     install_db_tools: 'install',
     seed_db: 'seed',
     set_db: 'set',
+    create_env: 'create-env',
+    env: 'create-env',
     migrate: 'migrate',
     rollback: 'rollback',
   };

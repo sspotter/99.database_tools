@@ -18,6 +18,7 @@ node db.js init
 node db.js tables
 node db.js scan
 node db.js install postgres mysql
+node db.js create-env postgres --database app_database --user postgres --password change_me
 ```
 
 ## Example workflow
@@ -42,6 +43,24 @@ LOCAL_DATABASE_URL=postgresql://devuser:%26Pf56ngsrkk@localhost:5432/gdfsg
 ```
 
 `DATABASE_URL` is also supported as a fallback.
+
+Generate a fresh env template and manifest for a specific engine:
+
+```bash
+node db.js create-env sqlite
+node db.js create-env postgres --database app_database --user postgres --password change_me
+node db.js create-env mysql --database app_database --user root --password change_me
+```
+
+On Ubuntu, PostgreSQL and MySQL need the server packages running, not just the client tools:
+
+```bash
+sudo apt-get update && sudo apt-get install -y postgresql postgresql-client
+sudo systemctl enable --now postgresql
+
+sudo apt-get update && sudo apt-get install -y mysql-server default-mysql-client
+sudo systemctl enable --now mysql
+```
 
 ## Design choices
 
