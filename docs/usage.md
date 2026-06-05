@@ -83,6 +83,13 @@ cp .env.example .env
 node db.js init
 ```
 
+Some Ubuntu images install MariaDB instead of Oracle MySQL. In that case the service may be named `mariadb`:
+
+```bash
+sudo apt-get update && sudo apt-get install -y mariadb-server default-mysql-client
+sudo systemctl enable --now mariadb
+```
+
 If you want a non-root MySQL app user:
 
 ```bash
@@ -91,7 +98,7 @@ cp .env.example .env
 node db.js init
 ```
 
-If MySQL refuses the connection, the CLI asks whether to start the local `mysql` service. If MySQL rejects the username or password, the CLI asks whether to create or update that user and grant access to the configured database using `sudo mysql`.
+If MySQL refuses the connection, the CLI asks whether to start a local MySQL-compatible service and tries `mysql`, `mysqld`, and `mariadb`. If none of those units exist, install `mysql-server` or `mariadb-server`. If MySQL rejects the username or password, the CLI asks whether to create or update that user and grant access to the configured database using `sudo mysql`.
 
 For PostgreSQL URLs, prefer `127.0.0.1` over `localhost` when you want TCP host/port behavior.
 
@@ -119,7 +126,7 @@ sudo -u postgres psql
 
 If your server user cannot run that command, run the printed setup commands manually or adjust PostgreSQL roles yourself.
 
-When MySQL refuses a connection on the configured host and port, the CLI asks whether it should start the local `mysql` service.
+When MySQL refuses a connection on the configured host and port, the CLI asks whether it should start a local MySQL-compatible service.
 
 When MySQL returns `Access denied`, the CLI asks whether it should create or update that user, create the configured database, and grant privileges using:
 
