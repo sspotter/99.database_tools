@@ -50,7 +50,7 @@ LOCAL_DATABASE_URL=postgresql://devuser:%26Pf56ngsrkk@localhost:5432/gdfsg
 - Versioned SQL files for schema changes and migrations.
 - Minimal dependencies so the toolkit can run on server hosts with just Node.js.
 - `scan` checks local CLI tools and reports whether the active engine is already connected.
-- `install` can use `winget` or `choco` to show install commands for selected database clients.
+- `install` can show install commands for Linux (`apt`, `dnf`, `pacman`, `zypper`) and Windows (`winget`, `choco`) package managers.
 - If `LOCAL_DATABASE_URL` points to PostgreSQL, the CLI uses `pg` directly and `psql` is optional.
 - If `LOCAL_DATABASE_URL` points to MySQL and the client is missing, the CLI can still show install commands.
 - PostgreSQL uses `schemas/postgres/schema.sql` and `schemas/postgres/update_schema.sql` by default.
@@ -58,4 +58,5 @@ LOCAL_DATABASE_URL=postgresql://devuser:%26Pf56ngsrkk@localhost:5432/gdfsg
 - If automatic installer launches are blocked, the CLI prints copy-paste install commands instead.
 - Use `node db.js set postgres` to generate `db-toolkit.manifest.json` for the selected engine.
 - Use `node db.js set postgres --url` to reuse the `LOCAL_DATABASE_URL` or `DATABASE_URL` already loaded from your env file.
+- On Ubuntu, install optional local clients with commands such as `sudo apt-get update && sudo apt-get install -y sqlite3 postgresql-client default-mysql-client`.
 - Use `node db.js install postgres --apply` only from a shell that is allowed to modify the machine.
