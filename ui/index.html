@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Database Toolkit</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">DB</span>
+        <span>Database Toolkit</span>
+      </div>
+      <div class="engine-pill" id="enginePill">engine: …</div>
+      <div class="warn-banner">Localhost dev tool — do not expose this port.</div>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="commands">Commands</button>
+      <button class="tab" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="errors">Errors <span class="badge" id="errorBadge" hidden>0</span></button>
+    </nav>
+
+    <main>
+      <section class="panel active" id="dashboard">
+        <div class="panel-head">
+          <h2>Status</h2>
+          <button class="ghost" id="refreshBtn">Refresh</button>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <h3>Connection</h3>
+            <div id="connectionStatus" class="status">checking…</div>
+          </div>
+          <div class="card">
+            <h3>Migrations</h3>
+            <div id="migrationsStatus" class="status">…</div>
+          </div>
+          <div class="card">
+            <h3>Clients</h3>
+            <div id="toolsStatus" class="status">…</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Tables</h3>
+          <ul id="tablesList" class="tables"><li class="muted">…</li></ul>
+        </div>
+      </section>
+
+      <section class="panel" id="commands">
+        <div class="panel-head"><h2>Commands</h2></div>
+        <div class="command-grid" id="commandGrid"></div>
+      </section>
+
+      <section class="panel" id="logs">
+        <div class="panel-head">
+          <h2>Logs</h2>
+          <button class="ghost" id="clearLogsBtn">Clear</button>
+        </div>
+        <pre class="console" id="logConsole"><span class="muted">No output yet. Run a command.</span></pre>
+      </section>
+
+      <section class="panel" id="errors">
+        <div class="panel-head">
+          <h2>Errors</h2>
+          <button class="ghost" id="clearErrorsBtn">Clear</button>
+        </div>
+        <div id="errorList"><p class="muted">No errors.</p></div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="modal" hidden>
+      <div class="modal">
+        <h3 id="modalTitle">Confirm</h3>
+        <p id="modalBody"></p>
+        <div class="modal-actions">
+          <button class="ghost" id="modalCancel">Cancel</button>
+          <button class="danger" id="modalConfirm">Run</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
