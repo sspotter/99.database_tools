@@ -111,6 +111,18 @@ main { padding: 20px; max-width: 980px; margin: 0 auto; }
 
 .tables { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .tables li { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-family: ui-monospace, monospace; }
+.tables li.table-row { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; }
+.table-row .table-name { font-family: ui-monospace, monospace; }
+.drop-btn {
+  background: transparent;
+  border: 1px solid #5a2c2c;
+  color: var(--err);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.drop-btn:hover { background: var(--err); color: #fff; }
 .muted { color: var(--muted); }
 
 .command-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }

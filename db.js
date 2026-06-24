@@ -147,7 +147,6 @@ function resolveCommand(name = 'help') {
     create_env: 'create-env',
     env: 'create-env',
     migrate: 'migrate',
-    rollback: 'rollback',
   };
   return aliases[name] ?? name;
 }

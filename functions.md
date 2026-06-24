@@ -25,7 +25,6 @@ node db.js backup
 node db.js restore backups/example.db
 node db.js health
 node db.js seed
-node db.js rollback
 node db.js set postgres
 node db.js set postgres --url
 ```
@@ -101,7 +100,7 @@ Tool scan results:
 - PostgreSQL engine: connected via pg driver (localhost:5432/gdfsg)
 - SQLite CLI: found at C:\path\to\sqlite3.exe
 - PostgreSQL CLI: not installed (optional; this project uses the pg driver)
-- MySQL CLI: missing
+- MySQL client: missing
 ```
 
 ## Install Clients

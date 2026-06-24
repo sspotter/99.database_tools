@@ -30,6 +30,31 @@ node db.js migrate
 node db.js backup
 ```
 
+## Web UI
+
+Start a local dashboard for running commands from the browser:
+
+```bash
+node db.js ui            # default port 4321
+node db.js ui --port 8080
+```
+
+The command prints a URL that includes a one-time access token, for example
+`http://127.0.0.1:4321/?token=<token>`. Open that URL — requests without the
+token are rejected.
+
+The dashboard shows the active engine, connection status, applied/pending
+migrations, and detected clients. From it you can:
+
+- **View tables** in the active database and **drop** any table with a
+  per-table confirm prompt.
+- **Run** the same commands as the CLI (init, migrate, seed, backup, reset, …),
+  with destructive actions gated behind a confirmation modal.
+- **Watch live output** in the Logs tab and review failures in the Errors tab.
+
+It is a **localhost-only development tool** bound to `127.0.0.1` — do not expose
+the port. The `ui`/`serve` commands cannot be triggered from the browser itself.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust the values for your environment.
@@ -73,7 +98,7 @@ sudo systemctl enable --now mysql
 - If `LOCAL_DATABASE_URL` points to PostgreSQL, the CLI uses `pg` directly and `psql` is optional.
 - If `LOCAL_DATABASE_URL` points to MySQL and the client is missing, the CLI can still show install commands.
 - PostgreSQL uses `schemas/postgres/schema.sql` and `schemas/postgres/update_schema.sql` by default.
-- Set `DB_TOOLKIT_EMOJI=true` to enable emoji status markers in terminal output.
+- Emoji status markers (✅/⚠️/❌) and green/colored output are on by default; set `DB_TOOLKIT_EMOJI=false` to disable the emoji (e.g. when logging to a plain file).
 - If automatic installer launches are blocked, the CLI prints copy-paste install commands instead.
 - Use `node db.js set postgres` to generate `db-toolkit.manifest.json` for the selected engine.
 - Use `node db.js set postgres --url` to reuse the `LOCAL_DATABASE_URL` or `DATABASE_URL` already loaded from your env file.

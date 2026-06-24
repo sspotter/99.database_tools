@@ -81,7 +81,7 @@ async function loadStatus() {
   if (!status.tables.length) {
     tablesEl.append(el('li', 'muted', status.tablesError || '(no tables)'));
   } else {
-    for (const name of status.tables) tablesEl.append(el('li', null, name));
+    for (const name of status.tables) tablesEl.append(tableRow(name));
   }
 
   migrationsEl.innerHTML = '';
@@ -101,6 +101,18 @@ async function loadStatus() {
 function dot(kind) {
   const span = el('span', `dot ${kind}`);
   return span;
+}
+
+const DROP_COMMAND = COMMANDS.find((c) => c.name === 'drop');
+
+function tableRow(name) {
+  const li = el('li', 'table-row');
+  li.append(el('span', 'table-name', name));
+  const dropBtn = el('button', 'drop-btn', 'Drop');
+  dropBtn.title = `Drop table "${name}"`;
+  dropBtn.addEventListener('click', () => confirmAndRun(DROP_COMMAND, [name], name));
+  li.append(dropBtn);
+  return li;
 }
 
 /* ---------- commands ---------- */
