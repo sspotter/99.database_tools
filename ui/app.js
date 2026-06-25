@@ -42,14 +42,30 @@ function el(tag, className, text) {
 }
 
 /* ---------- tabs ---------- */
+function activateTab(target) {
+  for (const tab of document.querySelectorAll('.tab')) tab.classList.toggle('active', tab.dataset.tab === target);
+  for (const panel of document.querySelectorAll('.panel')) panel.classList.toggle('active', panel.id === target);
+  if (target === 'errors') resetErrorBadge();
+}
+
 document.getElementById('tabs').addEventListener('click', (event) => {
   const button = event.target.closest('.tab');
   if (!button) return;
-  for (const tab of document.querySelectorAll('.tab')) tab.classList.toggle('active', tab === button);
-  const target = button.dataset.tab;
-  for (const panel of document.querySelectorAll('.panel')) panel.classList.toggle('active', panel.id === target);
-  if (target === 'errors') resetErrorBadge();
+  activateTab(button.dataset.tab);
 });
+
+/* ---------- toasts (so output is visible from any tab) ---------- */
+function toast(level, message) {
+  const stack = document.getElementById('toastStack');
+  const node = el('div', `toast ${level}`, message);
+  node.title = 'Click to open Logs';
+  node.addEventListener('click', () => {
+    activateTab('logs');
+    node.remove();
+  });
+  stack.append(node);
+  setTimeout(() => node.remove(), 5000);
+}
 
 /* ---------- dashboard ---------- */
 async function loadStatus() {
@@ -84,6 +100,8 @@ async function loadStatus() {
     for (const name of status.tables) tablesEl.append(tableRow(name));
   }
 
+  populateTableSelect(status.tables);
+
   migrationsEl.innerHTML = '';
   const applied = status.migrations.applied.length;
   const pending = status.migrations.pending.length;
@@ -107,12 +125,110 @@ const DROP_COMMAND = COMMANDS.find((c) => c.name === 'drop');
 
 function tableRow(name) {
   const li = el('li', 'table-row');
-  li.append(el('span', 'table-name', name));
+  const nameEl = el('span', 'table-name', name);
+  nameEl.title = `View rows in "${name}"`;
+  nameEl.addEventListener('click', () => openTableInView(name));
+  li.append(nameEl);
   const dropBtn = el('button', 'drop-btn', 'Drop');
   dropBtn.title = `Drop table "${name}"`;
   dropBtn.addEventListener('click', () => confirmAndRun(DROP_COMMAND, [name], name));
   li.append(dropBtn);
   return li;
+}
+
+/* ---------- table view ---------- */
+function populateTableSelect(tables) {
+  const select = document.getElementById('tvTableSelect');
+  const previous = select.value;
+  select.innerHTML = '';
+  if (!tables.length) {
+    const option = el('option', null, '(no tables)');
+    option.value = '';
+    select.append(option);
+    return;
+  }
+  for (const name of tables) {
+    const option = el('option', null, name);
+    option.value = name;
+    select.append(option);
+  }
+  if (tables.includes(previous)) select.value = previous;
+}
+
+function openTableInView(name) {
+  activateTab('tableview');
+  const select = document.getElementById('tvTableSelect');
+  if ([...select.options].some((option) => option.value === name)) {
+    select.value = name;
+    loadRows();
+  }
+}
+
+async function loadRows() {
+  const table = document.getElementById('tvTableSelect').value;
+  const meta = document.getElementById('tvMeta');
+  const resultEl = document.getElementById('tvResult');
+  if (!table) {
+    resultEl.innerHTML = '<p class="muted">No table selected.</p>';
+    return;
+  }
+  const limit = document.getElementById('tvLimit').value || 100;
+  meta.textContent = 'loading…';
+  resultEl.innerHTML = '';
+
+  let data;
+  try {
+    data = await api(`/api/rows?table=${encodeURIComponent(table)}&limit=${encodeURIComponent(limit)}`);
+  } catch (error) {
+    meta.textContent = '';
+    resultEl.innerHTML = '';
+    resultEl.append(el('p', 'tv-error', error.message));
+    return;
+  }
+  renderRows(data);
+}
+
+function renderRows(data) {
+  const meta = document.getElementById('tvMeta');
+  const resultEl = document.getElementById('tvResult');
+  resultEl.innerHTML = '';
+  meta.textContent = `${data.rows.length} row(s) · ${data.columns.length} column(s)`;
+
+  if (!data.columns.length) {
+    resultEl.append(el('p', 'muted', '(table has no columns)'));
+    return;
+  }
+
+  const table = el('table', 'data-table');
+  const headRow = el('tr');
+  for (const column of data.columns) headRow.append(el('th', null, column));
+  const thead = el('thead');
+  thead.append(headRow);
+  table.append(thead);
+
+  const tbody = el('tbody');
+  if (!data.rows.length) {
+    const row = el('tr');
+    const cell = el('td', 'muted', '(no rows)');
+    cell.colSpan = data.columns.length;
+    row.append(cell);
+    tbody.append(row);
+  } else {
+    for (const rowData of data.rows) {
+      const row = el('tr');
+      for (const column of data.columns) {
+        const value = rowData[column];
+        const cell = el('td', value === null ? 'null-cell' : null, value === null ? 'NULL' : String(value));
+        row.append(cell);
+      }
+      tbody.append(row);
+    }
+  }
+  table.append(tbody);
+
+  const wrap = el('div', 'data-table-wrap');
+  wrap.append(table);
+  resultEl.append(wrap);
 }
 
 /* ---------- commands ---------- */
@@ -184,6 +300,7 @@ async function runCommand(command, args) {
   } catch (error) {
     appendLog('error', error.message);
     addError(command.name, error.message);
+    toast('error', `${command.label}: ${error.message}`);
     return;
   }
 
@@ -191,6 +308,10 @@ async function runCommand(command, args) {
   if (!result.ok) {
     appendLog('error', result.error || 'Command failed.');
     addError(command.name, result.error || 'Command failed.');
+    toast('error', `${command.label}: ${result.error || 'failed'}`);
+  } else {
+    const lastOk = [...result.logs].reverse().find((entry) => entry.level === 'ok');
+    toast('ok', `${command.label}: ${lastOk ? lastOk.message : 'done'}`);
   }
   loadStatus();
 }
@@ -228,6 +349,9 @@ function resetErrorBadge() {
   document.getElementById('errorBadge').hidden = true;
 }
 
+document.getElementById('tvLoadBtn').addEventListener('click', loadRows);
+document.getElementById('tvRefreshBtn').addEventListener('click', loadStatus);
+document.getElementById('tvTableSelect').addEventListener('change', loadRows);
 document.getElementById('refreshBtn').addEventListener('click', loadStatus);
 document.getElementById('clearLogsBtn').addEventListener('click', () => {
   document.getElementById('logConsole').innerHTML = '<span class="muted">Cleared.</span>';

@@ -85,6 +85,34 @@ test("applying the repo's migrations creates the users and audit_log tables", (t
   assert.deepEqual(engine.listAppliedMigrations(), files);
 });
 
+test('previewRows returns columns and rows for a populated table', (t) => {
+  const { engine } = makeEngine(t);
+  engine.runSql('CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT);');
+  engine.runSql("INSERT INTO notes (body) VALUES ('alpha'),('beta');");
+
+  const result = engine.previewRows('notes', 100);
+  assert.deepEqual(result.columns, ['id', 'body']);
+  assert.equal(result.rows.length, 2);
+  assert.equal(result.rows[0].body, 'alpha');
+});
+
+test('previewRows reports columns (no rows) for an empty table and honors the limit', (t) => {
+  const { engine } = makeEngine(t);
+  engine.runSql('CREATE TABLE empty_t (a INTEGER, b TEXT);');
+  const empty = engine.previewRows('empty_t', 100);
+  assert.deepEqual(empty.columns, ['a', 'b']);
+  assert.deepEqual(empty.rows, []);
+
+  engine.runSql('CREATE TABLE many (id INTEGER);');
+  engine.runSql('INSERT INTO many (id) VALUES (1),(2),(3),(4),(5);');
+  assert.equal(engine.previewRows('many', 2).rows.length, 2);
+});
+
+test('previewRows rejects an unknown table instead of interpolating it into SQL', (t) => {
+  const { engine } = makeEngine(t);
+  assert.throws(() => engine.previewRows('no_such_table'), /Unknown table/);
+});
+
 test('reset drops every existing table including the migration ledger then rebuilds from the schema file', (t) => {
   const { engine, dir } = makeEngine(t);
   engine.runSql('CREATE TABLE stale (id INTEGER);');

@@ -19,6 +19,7 @@
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="dashboard">Dashboard</button>
       <button class="tab" data-tab="commands">Commands</button>
+      <button class="tab" data-tab="tableview">Table View</button>
       <button class="tab" data-tab="logs">Logs</button>
       <button class="tab" data-tab="errors">Errors <span class="badge" id="errorBadge" hidden>0</span></button>
     </nav>
@@ -54,6 +55,22 @@
         <div class="command-grid" id="commandGrid"></div>
       </section>
 
+      <section class="panel" id="tableview">
+        <div class="panel-head">
+          <h2>Table View</h2>
+          <button class="ghost" id="tvRefreshBtn">Refresh tables</button>
+        </div>
+        <div class="tv-controls">
+          <select id="tvTableSelect"></select>
+          <label class="tv-limit">Limit
+            <input id="tvLimit" type="number" min="1" max="1000" value="100" />
+          </label>
+          <button class="run-btn" id="tvLoadBtn">Load rows</button>
+          <span class="tv-meta muted" id="tvMeta"></span>
+        </div>
+        <div class="tv-result" id="tvResult"><p class="muted">Pick a table and load its rows.</p></div>
+      </section>
+
       <section class="panel" id="logs">
         <div class="panel-head">
           <h2>Logs</h2>
@@ -81,6 +98,8 @@
         </div>
       </div>
     </div>
+
+    <div class="toast-stack" id="toastStack"></div>
 
     <script src="app.js"></script>
   </body>

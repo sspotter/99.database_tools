@@ -48,9 +48,14 @@ migrations, and detected clients. From it you can:
 
 - **View tables** in the active database and **drop** any table with a
   per-table confirm prompt.
+- **Browse table contents** in the **Table View** tab — pick a table (or click a
+  table name on the Dashboard), choose a row limit, and load the rows. Row
+  preview is available for SQLite and PostgreSQL.
 - **Run** the same commands as the CLI (init, migrate, seed, backup, reset, …),
   with destructive actions gated behind a confirmation modal.
-- **Watch live output** in the Logs tab and review failures in the Errors tab.
+- **See output anywhere** — every command pops a colored toast (click it to jump
+  to Logs); the Logs tab keeps the full stream and the Errors tab collects
+  failures.
 
 It is a **localhost-only development tool** bound to `127.0.0.1` — do not expose
 the port. The `ui`/`serve` commands cannot be triggered from the browser itself.
