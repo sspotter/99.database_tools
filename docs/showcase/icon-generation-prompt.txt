@@ -1,0 +1,29 @@
+Create one premium logo and app-icon concept contact sheet for "Database Toolkit", a localhost developer utility for SQLite/PostgreSQL/MySQL/SQL Server database operations, table browsing, migrations, backups, restore, command execution and logs. EXACTLY 24 DISTINCT ICON CONCEPTS in a perfectly regular 6 columns × 4 rows grid. Number them 01 through 24 left-to-right, top-to-bottom. Every number must be readable and OUTSIDE the artwork beneath its icon. Include a short 1–3 word theme caption next to each number. Large high-resolution landscape sheet, ideally 3000x2000 or higher. Header "DATABASE TOOLKIT" with smaller "24 icon directions". Quiet neutral warm-white sheet background, generous margins and gutters, equal-sized cells; each icon centered with plenty of clear space. Use a dark or light rounded-square app tile only when the specific direction benefits; some icons can be freestanding emblems. No browser UI, devices, mockups, stationery, watermarks, lorem ipsum, dense explanations or perspective.
+
+These are true identity concepts, recognisable as simple app icons at 32px: bold silhouettes, minimal detail, excellent negative space and bespoke shapes. VARY THE SILHOUETTE, CENTRAL IDEA, MATERIAL AND COLOR, not merely recoloring the same database cylinder. Avoid putting DB text on all icons. At most two concepts may use letterforms. No stock clipart or copied brands. Overall professionally curated and precise. Themes:
+01 "Core Stack": existing app palette dark navy #0f1419 and vivid blue #4a9eff, three clean database disks, central negative-space spark.
+02 "Command Prompt": sharp charcoal terminal glyph >_ cleverly fused into blue database base.
+03 "Migration Path": flowing orange stepped arrow threading through three small offset slabs.
+04 "Safe Harbor": emerald shield enclosing negative-space database.
+05 "Orbit": cobalt circular orbital ring intersecting a compact dark database core, simple flat geometry.
+06 "Monogram": crafted DB geometric ligature in ivory on ink.
+07 "Blueprint": architectural ultramarine wireframe cube with one bold structural accent, restrained.
+08 "Kiln": terracotta and cream sculptural stacked ceramic-inspired data slabs, flat graphic emblem.
+09 "Paper Fold": crisp folded cyan paper ribbon suggesting data layers.
+10 "Precision": black-and-white Swiss geometric symbol with aligned horizontal data slots.
+11 "Circuit": lime on deep forest green branching circuitry in compact hexagonal silhouette.
+12 "Restore Loop": coral circular return arrow wrapped around a small solid backup block.
+13 "Vault": brass and midnight simple vault-door emblem with subtle database stack reference.
+14 "Pixel Forge": chunky 8-bit violet and lavender compact data chest, very few large pixels.
+15 "Switchboard": teal connected nodes in a square, a strong asymmetric routing pattern.
+16 "Index Tabs": mustard yellow three staggered index tabs on warm charcoal.
+17 "Signal": electric blue clean vertical waveform merged with stacked data bands.
+18 "Prism": jewel-toned faceted triangular data crystal, simple planes not complex polygons.
+19 "Data Sprout": green two-leaf sprout growing out of a single data disk, clever silhouette.
+20 "Night Shift": midnight square with ivory crescent cradling a tiny blue database, elegant.
+21 "Toolbox": burnt orange compact abstract toolbox with negative-space data layers, no tiny tools.
+22 "Flow": magenta continuous ribbon in a compact angular S showing migration flow.
+23 "Porcelain": quiet ivory and slate blue rounded three-layer emblem with delicate dimensional shading.
+24 "Industrial": bold black and safety-yellow interlocking bracket / data-block icon, stencil-like precision.
+
+Keep all 24 icons equally prominent and optically balanced. Each design must be visibly distinct from all others. Number and caption styling consistent across the entire sheet. Exactly 24 icons, exactly 24 labels, no missing or repeated numbers, no cropped artwork. Use the real project palette faithfully in concept 01 and freely explore the specified variant themes elsewhere. This is an exploratory raster concept sheet for selection, not final vector exports.

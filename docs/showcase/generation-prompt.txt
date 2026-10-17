@@ -1,0 +1,25 @@
+Create ONE exceptionally crisp high-resolution landscape UI showcase image for the existing web application "Database Toolkit". A flat front-facing editorial contact sheet of ALL FIVE app pages and a sixth interaction-state panel, exactly 3 columns by 2 rows, generous consistent gutters, all screens fully visible with NO overlap, no perspective, no devices, no decorative 3D. Aim for 3000x2000 or larger readable output. This is a VISUAL CONCEPT grounded in an existing app, not an actual screenshot. Small header above grid: "DATABASE TOOLKIT" and subtitle "Complete web UI showcase"; small note "Visual concept · Demo data". Each of the six panels gets a clear external numbered caption.
+Preserve the incumbent design language faithfully: background #0f1419, topbar #171d26, cards #1d2530, subtle borders #2a3441, primary text #e6edf3, muted #8a97a8, blue #4a9eff, green #3fb950, amber #d29922, red #f85149. System sans typography and monospace for terminal/data. Restrained modest radii, professional dense developer tool, impeccable alignment and meaningful realistic contents. NO purple gradients, glass or marketing charts.
+All FIVE page panels share the same slim full-width top bar with blue square "DB", "Database Toolkit", engine pill "sqlite · toolkit.db", and small amber "Localhost only". Below it use horizontal tab navigation EXACTLY "Dashboard", "Commands", "Table View", "Logs", "Errors", active page blue underline. Red count badge on Errors where suitable. Do not invent sidebar navigation, login, SQL editor, billing, cloud services, analytics, chart widgets, or extra pages.
+
+Panel 01, top left caption "01 / Dashboard": page heading "Status" with Refresh. Three adjacent modest status blocks: "Connection" green "Connected · 4 tables"; "Migrations" amber "8 applied · 2 pending"; "Clients" green "SQLite available". Below Tables list: users, projects, tasks, schema_migrations. Each row table name blue clickable and small red Drop action. A footer phrase in panel "Inspect health, migrations and tables".
+
+Panel 02, top middle caption "02 / Commands": show ALL FOURTEEN command actions in compact 3-column grid with short descriptions and tiny Run buttons, sensible density. Names: Init, Create, List Tables, Health Check, Scan Clients, Migrate, Seed, Update, Backup, Set Engine, Create Env, Reset, Drop Table, Restore. Appropriate argument fields for Update showing "schemas/update_schema.sql", Backup showing "backups/demo.sql", Set Engine showing "sqlite", Create Env showing "postgres", Drop Table showing "tasks", Restore showing "backups/demo.sql". Last three destructive controls use restrained red accents. Footer phrase "Run operations from one place".
+
+Panel 03, top right caption "03 / Table View": heading "Table View", button "Refresh tables". Controls dropdown "users", numeric "Limit 100", blue "Load rows". Metadata "4 rows · 4 columns". Beautiful readable data grid with id, name, email, created_at; rows of clearly synthetic demo people Alex Demo, Morgan Demo, Sam Demo, Taylor Demo and emails at example.com; dates 2026-10-16. Footer "Preview rows without leaving the toolkit". No unsupported row-editing, query or export controls.
+
+Panel 04, bottom left caption "04 / Logs": heading Logs and Clear action, substantial monospace console shows:
+"$ db health"
+"OK  Database connection established"
+"$ db migrate"
+"OK  Applied 009_add_tasks.sql"
+"OK  Applied 010_add_indexes.sql"
+"$ db backup backups/demo.sql"
+"OK  Backup saved"
+Use green success lines and subdued timestamps as visual sample. Footer "Read command output in one stream".
+
+Panel 05, bottom middle caption "05 / Errors": heading Errors, Clear action, two stacked error entries, red left border, legible monospace command and message: "db restore backups/missing.sql" with "Backup file not found." and "db drop unknown_table" with "Table does not exist." Muted times. One subtle inset mini empty-state sample at bottom labeled "Empty state" with "No errors." Footer "Find failed commands and their messages".
+
+Panel 06, bottom right caption "06 / Confirmation & notifications": clearly separated UI state specimens, not a sixth app page. A confirmation modal titled "Confirm: Drop Table"; text 'Drop one table. This affects the active database (tasks). This cannot be undone.' Buttons "Cancel" and red "Run". Beneath two full-width notification examples green "Backup: Backup saved" and red "Restore: Backup file not found." Small label "Click a notification to open Logs". Footer "Review destructive actions and see results".
+
+Entire image must be an elegant unified showcase board, enough padding, every panel comfortably readable, consistent actual app chrome, no clipped screens, no overlapping floating windows, no fictitious claims. The board should immediately communicate which pages exist and what each needs to show. Prioritize correct text and crisp UI over decoration.
