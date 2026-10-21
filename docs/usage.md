@@ -1,6 +1,6 @@
 # Usage
 
-The CLI supports SQLite and PostgreSQL directly and uses native clients for MySQL and SQL Server operations. The local web workspace uses direct drivers for all four connection types; it does not require `psql`, `mysql`, or `sqlcmd` for browsing or SQL. Some CLI operations, such as PostgreSQL backup (`pg_dump`) and administrative recovery (`psql`), still need native clients.
+The CLI uses Node's SQLite API and server drivers for coordinated migrations. PostgreSQL schema/query operations use `pg`; PostgreSQL backup requires `pg_dump` and restore requires `psql`. MySQL backup requires `mysqldump`, and its other legacy CLI operations, including restore, use `mysql`; migrations use `mysql2`. SQL Server's supported legacy operations use `sqlcmd`, but backup, restore, and migrations are unsupported. The local web workspace uses direct drivers and does not require these native clients for browsing or SQL.
 
 ## Quick start
 
@@ -121,8 +121,89 @@ statements excluded. SQL can still contain private data; clear history as needed
 
 The Dashboard and Logs concern the workspace. Destructive command controls,
 row editing, import, backup/restore, and migration management remain outside this
-UI release; use the existing CLI where appropriate. The older safety plan has not
-been completed by this feature, apart from the SQLite opening/recovery fix.
+UI release; use the existing CLI where appropriate. The CLI safety batch below
+does not enable these management controls or complete every older release gate.
+
+## CLI backup and restore
+
+`node db.js backup [output]` uses the configured backup directory when no output
+is supplied. SQLite backups default to `.db`; PostgreSQL/MySQL backups are SQL
+dumps. All three refuse an existing output, including one created during backup.
+Publication uses a sibling stage and an atomic hard link, so the destination
+filesystem must support hard links. Failed operations clean only their own stage.
+
+SQLite uses `VACUUM INTO` and integrity checks to include committed WAL pages,
+even when another connection remains open. `node db.js restore <file>` validates
+the SQLite header, source integrity, and staged snapshot before replacing the
+target. Same-file and hard-link input aliases, and symlink targets, are refused.
+
+Stop all external applications using the SQLite target before restore. The
+toolkit checkpoints through SQLite, checks journal/exclusive locking, and refuses
+remaining WAL/SHM/journal files; it never unlinks another connection's recovery
+files. These checks cannot detect every idle external handle or stop another
+application from opening the file between checks and replacement. Ordinary
+validation, busy, and publication failures retain the old database. If replacement
+succeeds but reopen fails, rollback is attempted; if rollback also fails, the
+error identifies the retained `.dbtk-restore-*/original.db` for manual recovery.
+An interrupted process can leave its `.dbtk-restore.lock` or stage behind: first
+verify no restore is running, inspect/recover the database and any retained
+original, then remove only the abandoned operation's files. Power-loss recovery
+and directory durability are not fully verified.
+
+Server backups stream native stdout to an operation-owned `.partial` file;
+there is no former 50 MiB dump buffer limit. Native operations have a ten-minute
+timeout, bounded stderr capture, and redacted diagnostics. Passwords are passed
+through client environment variables, not command arguments. PostgreSQL uses
+the resolved URL's host, port, database, credentials, and supported libpq
+TLS/authentication parameters. Actual TLS handshakes still need separate tests.
+
+PostgreSQL restore accepts trusted plain `pg_dump` output and requires a separate
+empty database. It checks for user relations, routines, types, extra schemas,
+and extensions other than `plpgsql`, then runs `psql --single-transaction` with
+`ON_ERROR_STOP=1`. A SQL error rolls back the restore; populated targets are
+refused without dropping objects. Keep the target unused during this preflight
+and restore. Custom/archive dumps and arbitrary scripts with transaction or
+client-control commands are outside this restore contract.
+
+MySQL dumps use `--single-transaction --quick --skip-lock-tables --hex-blob`.
+Consistency applies to transactional tables; stop concurrent DDL and writes to
+nontransactional tables for a consistent backup. MySQL restore streams into
+`mysql` and can leave committed changes after failure; use a separate disposable
+target first. No atomic MySQL restore guarantee is provided.
+
+## CLI migrations
+
+`node db.js migrate [dir]` applies pending `.sql` files in filename order. The
+configured default is still the generic migration directory: choose SQL
+compatible with the selected engine explicitly. SQL Server is refused before
+database writes. Top-level transaction control, `SET` statements, and client directives are rejected
+before execution; remove outer `BEGIN`/`COMMIT` wrappers and `DELIMITER`/`SOURCE`
+directives from migration files. PostgreSQL dollar-quoted bodies and SQLite
+trigger bodies are recognized. This is control validation, not a SQL sandbox.
+
+SQLite uses `BEGIN IMMEDIATE` per file and rechecks the ledger under the write
+lock. PostgreSQL uses one client and a database advisory lock across the run,
+with one transaction per file. SQL and ledger/checksum inserts commit together;
+failed files remain pending. Earlier successfully committed files stay applied.
+
+`schema_migrations` retains existing filenames and timestamps. New applications
+also record SHA-256 checksums in `schema_migration_checksums`. Editing an applied
+file with a recorded checksum stops the run: restore its original contents and
+put the change in a new migration. Legacy ledger entries without checksums emit
+an unverified warning and are skipped without reapplying.
+
+MySQL uses a direct session and `GET_LOCK`, plus InnoDB
+`schema_migration_attempts` rows with `started`, `applied`, or `failed` status.
+DDL may commit before a later statement or ledger insert fails. An incomplete
+attempt anywhere in that table blocks automatic reruns, including after process
+interruption. Do not simply delete the attempt and retry. Inspect the attempt's
+filename/checksum and actual schema, manually undo its effects or finish the
+migration, reconcile `schema_migrations` and `schema_migration_checksums` with the
+chosen outcome, then remove the repaired attempt row before rerunning. Keep a
+backup and record the repair. Existing legacy rows remain skipped as above.
+MySQL migrations refuse executable comments and session SQL modes
+`ANSI_QUOTES`/`NO_BACKSLASH_ESCAPES`. Configure the session outside migration
+files and use explicit schema-qualified names where needed.
 
 ## Tests
 
@@ -133,8 +214,8 @@ npm test
 
 Use a Node.js runtime with `node:sqlite` support; development verification uses
 Node 23.9.0, which emits an experimental SQLite warning. With
-`DB_TOOLKIT_TEST_POSTGRES_URL` and `DB_TOOLKIT_TEST_MYSQL_URL` unset, the suite uses
-temporary local fixtures and skips its eight live server tests. It does not use
+all integration variables below unset, the suite uses
+temporary local fixtures and skips its live server tests. It does not use
 the project's `LOCAL_DATABASE_URL` or `DATABASE_URL` as integration targets.
 
 To run live tests, provision disposable databases and accounts with permission to
@@ -157,6 +238,28 @@ rejection, writable routing, duplicate labels, and actual server cancellation,
 plus PostgreSQL JSON bounds and composite foreign keys. SQL Server has no live
 integration fixture in this suite. A passing local suite with skipped live tests
 does not establish server integration or TLS behavior.
+
+Additional CLI safety integration targets are explicit and independent of those
+workspace variables:
+
+| Variable | Target and permissions |
+|---|---|
+| `DB_TOOLKIT_TEST_POSTGRES_MIGRATION_URL` | PostgreSQL admin connection allowed to create/drop unique `dbtk_test_*` databases; migration tests operate only in those scratch databases. |
+| `DB_TOOLKIT_TEST_MYSQL_MIGRATION_URL` | Dedicated disposable MySQL database whose name starts `dbtk_test_`; tests create/drop their migration and example tables there. |
+| `DBTK_TEST_PG_ADMIN_URL` | PostgreSQL admin connection allowed to create/drop unique native backup/restore scratch databases. |
+| `DBTK_TEST_MYSQL_BACKUP_URL` | Separate disposable MySQL database starting `dbtk_test_` for native dump/restore tests. |
+| `DBTK_TEST_NATIVE_DOCKER` | Optional native-test transport through the named containers in `compose.demo.yaml`; omit to use installed local clients. |
+
+With the appropriate targets set, run
+`node --test test/migrations.test.js test/migration-integration.test.js` or
+`node --test test/server-backup-integration.test.js`. The migration tests include
+concurrent real processes, killed runners, failed SQL, rejected ledger writes,
+and checksum mismatches. Native tests include COPY/null/quote/multiline round trips,
+populated-target refusal, rollback after SQL failure, and a transactional MySQL
+dump/restore. The default local tests cover a dump over 60 MiB, process failures,
+timeouts/abort, destination collisions, redaction, and SQLite WAL/busy/recovery
+cases. These fixtures leave visible demo tables untouched; do not substitute
+project database URLs for their disposable targets.
 
 ## Create env files
 
@@ -266,13 +369,13 @@ When an operation fails because a required table is missing, the CLI asks whethe
 ## Notes
 
 - `reset`, `drop`, and `restore` ask for confirmation unless `--yes` is set.
-- SQLite backups are file copies, so the default backup extension is `.db`.
+- SQLite backups are validated snapshots; their default extension is `.db`.
 - PostgreSQL and MySQL backups are SQL dumps.
 - The default SQLite database file is `data/toolkit.db`.
 - `scan` checks local CLI tools and reports the active engine connection.
 - `install` uses the available package manager to show or run selected client installs.
 - You can set `LOCAL_DATABASE_URL` or `DATABASE_URL` to configure a database in one line.
-- PostgreSQL init and schema operations use `pg`, so `psql` is optional for this toolkit.
+- PostgreSQL init/schema operations and migrations use `pg`; backup requires `pg_dump` and restore requires `psql`.
 - If that URL points to MySQL and the client is missing, the CLI can still generate install commands.
 - The toolkit loads `.env`, `.env.local`, and `.ENV` if present.
 - PostgreSQL defaults to `schemas/postgres/schema.sql` and `schemas/postgres/update_schema.sql`.

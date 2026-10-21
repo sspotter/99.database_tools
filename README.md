@@ -8,7 +8,7 @@ Single-entry database operations CLI for development, staging, and production wo
 - PostgreSQL uses the `pg` driver directly, so `init` works from `LOCAL_DATABASE_URL` without `psql`.
 - The web workspace uses direct PostgreSQL, MySQL, and SQL Server drivers. Native clients are only needed for applicable CLI operations, not workspace browsing or SQL.
 - The command structure is unified behind `db.js`.
-- Migrations are applied in filename order and tracked in `schema_migrations`.
+- Migrations run in filename order with per-engine locking, checksum tracking, and failure recovery checks.
 
 ## Run it
 
@@ -117,12 +117,12 @@ sudo systemctl enable --now mysql
 ## Design choices
 
 - One CLI entry point instead of many one-off scripts.
-- Destructive CLI operations have confirmation prompts; the earlier backend safety plan remains incomplete apart from the SQLite opening/recovery fix.
+- Destructive CLI operations have confirmation prompts. SQLite snapshots/restores, streamed server dumps, and coordinated migrations implement the first three CLI safety priorities; the remaining release gates are tracked separately.
 - Versioned SQL files for schema changes and migrations.
 - SQLite uses the bundled Node API; server workspace connections use npm drivers.
 - `scan` checks local CLI tools and reports whether the active engine is already connected.
 - `install` can show install commands for Linux (`apt`, `dnf`, `pacman`, `zypper`) and Windows (`winget`, `choco`) package managers.
-- If `LOCAL_DATABASE_URL` points to PostgreSQL, the CLI uses `pg` directly and `psql` is optional.
+- PostgreSQL schema/query operations and migrations use `pg`; backup requires `pg_dump`, and restore requires `psql`.
 - If `LOCAL_DATABASE_URL` points to MySQL and the client is missing, the CLI can still show install commands.
 - PostgreSQL uses `schemas/postgres/schema.sql` and `schemas/postgres/update_schema.sql` by default.
 - Emoji status markers (✅/⚠️/❌) and green/colored output are on by default; set `DB_TOOLKIT_EMOJI=false` to disable the emoji (e.g. when logging to a plain file).
@@ -139,6 +139,25 @@ npm test
 ```
 
 The default suite uses temporary local fixtures and needs no database server when
-the opt-in integration variables are unset. Eight live PostgreSQL/MySQL tests in
-`test/workspace-integration.test.js` run only with explicitly supplied disposable
-database URLs. See [test setup and remaining verification](docs/usage.md#tests).
+the opt-in integration variables are unset. Workspace, migration, and native
+backup/restore integration tests require explicit disposable server targets.
+See [test setup and remaining verification](docs/usage.md#tests).
+
+## Backup, restore, and migration limits
+
+SQLite backups include committed WAL data through a validated `VACUUM INTO`
+snapshot. Existing backup destinations are refused. Stop external applications
+before SQLite restore; busy targets and remaining recovery sidecars are refused,
+and invalid inputs are checked before replacement.
+
+PostgreSQL and MySQL dumps stream to a private partial file and publish only on
+success. PostgreSQL restores trusted plain `pg_dump` output into an empty target
+through `psql` with one transaction and stop-on-error. MySQL dumps provide
+transactional-table consistency; concurrent DDL and nontransactional tables need
+a maintenance window. MySQL restore can leave partial changes after failure.
+
+SQLite/PostgreSQL migrations commit SQL and ledger updates together. MySQL
+records durable attempts because DDL can commit implicitly; failed or interrupted
+attempts block automatic retry until manual repair. SQL Server migrations and
+backup/restore are unsupported. See [operating instructions](docs/usage.md#cli-backup-and-restore)
+and [migration recovery](docs/usage.md#cli-migrations).

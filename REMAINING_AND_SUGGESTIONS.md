@@ -29,7 +29,8 @@ connection options, result truncation, transaction behavior, and credential rule
 
 ## Verification boundaries
 
-Verified on 2026-10-21 against the disposable local demo:
+Workspace baseline verified on 2026-10-21 against the disposable local demo,
+before the CLI safety batch:
 
 - All 88 automated tests passed, with zero failures and zero skips, including
   all eight live PostgreSQL/MySQL integration cases.
@@ -50,12 +51,24 @@ Verified on 2026-10-21 against the disposable local demo:
   and loopback-only published ports. Provisioning on another machine still
   requires adding profiles as described below.
 
-The automated suite includes disposable SQLite/profile/API fixtures and eight
-opt-in PostgreSQL/MySQL integration tests. See
+That baseline included disposable SQLite/profile/API fixtures and eight
+opt-in PostgreSQL/MySQL workspace integration tests. See
 [test setup](docs/usage.md#tests). Those live tests cover discovery, rows,
 inspection, read-only rejection, writable routing, and server cancellation, plus
-PostgreSQL JSON bounds and composite foreign keys. They do not test legacy CLI
-backup/restore or migration recovery.
+PostgreSQL JSON bounds and composite foreign keys. Separate CLI safety fixtures
+now cover backup/restore and migration recovery; the historical 88-test count
+above is not the current batch's final suite result.
+
+Final CLI safety verification on Windows / Node 23.9.0 passed **144 of 145
+tests**, with **zero failures** and **one skip** (Windows symlink privilege was
+unavailable). All live integration variables were set: this included the eight
+workspace PostgreSQL/MySQL cases, native server backup/restore round trips,
+three-engine migration concurrency, killed-process recovery, and MySQL durable
+incomplete-attempt blocking. Local tests also exercised WAL snapshots,
+invalid/busy restores, failed publication, >60 MiB output, timeout/abort,
+credentials, routing, and transaction-control regressions. Independent review
+findings were fixed before this fresh full-suite run. Authenticated read-only
+queries still returned 150 orders in each of the three saved demo profiles.
 
 SQL Server live integration and real TLS handshakes/certificate rejection remain
 unverified. Passing configuration tests does not establish either behavior.
@@ -115,22 +128,23 @@ explicitly. For missing-container/connection errors, check
 seed or connection test. Investigate a marker refusal instead of pointing the
 script at an existing project database.
 
-## Priority 1: finish the CLI data-safety work
+## Priority 1: CLI data safety delivered and remaining release gates
 
 The workspace does not complete the
 [earlier safety plan](docs/superpowers/plans/2026-10-17-database-toolkit-improvements.md).
-The SQLite ordinary-open recovery-file fix is present; the remaining safety
-items below still need implementation and disposable failure/recovery tests.
-Finish these before adding backup, restore, reset, migration, or data-editing
+The first three priorities are implemented in the
+[CLI safety batch](docs/superpowers/plans/2026-10-21-cli-safety-batch.md), with
+the operating limits below. Complete the remaining
+release gates before adding backup, restore, reset, migration, or data-editing
 controls to the workspace.
 
-| Order | Remaining work | Current source and acceptance evidence needed |
+| Order | Status/work | Current source and verification limits |
 |---|---|---|
-| 1 | SQLite snapshot backup and validated restore | `lib/engines/sqlite.js` still copies files for backup/restore. Validate a staged restore before replacing the target; preserve working data on invalid input, same-file input, interruption, and replacement failure. Prove that backup includes committed WAL data. |
-| 2 | Stream dumps and restore PostgreSQL through a compatible client | `lib/engines/postgres.js` buffers `pg_dump` output with a 50 MiB maximum and restores by passing the file to `pg`; `lib/engines/external.js` also buffers MySQL dump output. Stream to a temporary destination and publish only on success; verify a large dump, partial failure, and a PostgreSQL round-trip into an empty disposable target. |
-| 3 | Atomic migration execution and ledger updates | `lib/commands.js` runs each migration and records it in separate calls. Add per-engine coordination, concurrency exclusion, and failure tracking; prove no silent applied-but-unrecorded migration. Account for MySQL implicit DDL commits. |
+| 1 | Delivered: SQLite snapshot backup and validated restore | `lib/sqlite-files.js` uses checked `VACUUM INTO` snapshots, same-file/alias checks, busy/recovery refusal, staged replacement, and retained originals when rollback fails. Stop external target users: idle handles and reopen races cannot be fully detected. Hard-link support is required; abrupt interruption can require lock/stage recovery. Full power-loss/platform guarantees remain unverified. |
+| 2 | Delivered: streamed native dumps and PostgreSQL empty-target restore | `lib/process-runner.js` bounds diagnostics, streams I/O, handles timeout/abort, preserves existing outputs, and publishes only successful dumps. PostgreSQL uses trusted plain dumps through `psql --single-transaction`/`ON_ERROR_STOP`; requires an unused empty target. MySQL uses transactional dump options, but nontransactional tables/concurrent DDL need maintenance and restore can partially commit. Native clients, actual TLS, and broader OS/version coverage remain separate verification gates. |
+| 3 | Delivered: coordinated migrations and durable MySQL attempts | `lib/migrations.js` locks sessions, checks new-file checksums, retains legacy rows as unverified, and commits SQLite/PostgreSQL SQL+ledger together. MySQL started/failed attempts block retry for manual repair because DDL is not atomic. SQL Server is rejected before writes. Transaction/client controls, top-level SET statements, and unsupported MySQL SQL modes/comments are refused. |
 | 4 | Engine-specific migration/seed defaults and legacy table identity | `config/database.js` still defaults to generic `migrations` and `schemas/seed.sql`. Preserve applied filenames while selecting compatible SQL. Carry schema/table identity through legacy CLI operations and test duplicate names in different schemas before destructive use. |
-| 5 | Complete the safety release gates | Run the older plan's restore, migration, concurrency, large-output, runtime/platform, and API checks on disposable targets. Keep its proposed files and unchecked tasks distinct from delivered code. |
+| 5 | Pending: complete the safety release gates | Fresh integrated checks passed (144 passed, 1 privilege skip); run the remaining runtime/platform/API/TLS matrix on disposable targets. Keep unchecked tasks in the older plan distinct from this delivered subset. |
 
 The older [fix plan](docs/fix-plan.md) is historical: it includes work already
 present, including PostgreSQL backup, automated tests, and the Web UI. Use the

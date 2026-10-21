@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { SqliteEngine } from '../lib/engines/sqlite.js';
 import { listSqlFiles } from '../lib/utils.js';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 
 // Resolve the repo's real schema/migration files relative to this test file so
 // the suite runs regardless of the process cwd.
@@ -37,6 +38,24 @@ test('createDatabase reports creation only on first call', (t) => {
 
   const second = engine.createDatabase();
   assert.equal(second.created, false);
+});
+
+test('opening waits for an external write lock before initializing durability pragmas', async t => {
+  const { engine } = makeEngine(t);
+  engine.runSql('CREATE TABLE notes(body TEXT)');
+  engine.close();
+  const peer = spawn(process.execPath, ['--input-type=module', '-e', `
+    import {DatabaseSync} from 'node:sqlite';
+    const db = new DatabaseSync(process.argv[1]);
+    db.exec('BEGIN EXCLUSIVE');
+    process.stdout.write('locked');
+    setTimeout(() => { db.exec('ROLLBACK'); db.close(); }, 400);
+  `, engine.databasePath], { stdio: ['ignore', 'pipe', 'ignore'] });
+  const exited = new Promise((resolve, reject) => { peer.on('exit', resolve); peer.on('error', reject); });
+  t.after(async () => { if (peer.exitCode === null) peer.kill('SIGKILL'); await exited; });
+  await new Promise((resolve, reject) => { peer.stdout.once('data', resolve); peer.once('error', reject); });
+  assert.deepEqual(engine.listTables(), ['notes']);
+  assert.equal(await exited, 0);
 });
 
 test('opening recovers committed WAL pages and retains durable journal settings', (t) => {
@@ -175,4 +194,198 @@ test('backup then restore round-trips data and restore overwrites the live datab
   engine.restore(snapshot);
   const rows = engine.open().prepare('SELECT body FROM notes').all();
   assert.deepEqual(rows.map((row) => row.body), ['hello']);
+});
+
+test('backup includes committed WAL pages while another connection stays open', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql('PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE notes(body TEXT);');
+  const peer = new DatabaseSync(engine.databasePath);
+  try {
+    peer.exec("INSERT INTO notes VALUES('committed in WAL')");
+    const snapshot = path.join(dir, "snapshot with ' quote.db");
+    assert.equal(engine.backup(snapshot), snapshot);
+    const copy = new DatabaseSync(snapshot, { readOnly: true });
+    try {
+      assert.deepEqual(copy.prepare('SELECT body FROM notes').all().map(row => row.body), ['committed in WAL']);
+    } finally { copy.close(); }
+  } finally { peer.close(); }
+});
+
+test('backup refuses an existing output without overwriting it', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql('CREATE TABLE notes(body TEXT)');
+  const snapshot = path.join(dir, 'snapshot.db');
+  fs.writeFileSync(snapshot, 'keep this backup');
+  assert.throws(() => engine.backup(snapshot));
+  assert.equal(fs.readFileSync(snapshot, 'utf8'), 'keep this backup');
+});
+
+test('backup snapshots an initialized database with no tables', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.createDatabase();
+  const snapshot = path.join(dir, 'empty.db');
+  engine.backup(snapshot);
+  engine.restore(snapshot);
+  assert.deepEqual(engine.listTables(), []);
+});
+
+test('restore rejects a truncated SQLite database before replacing data', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('original')");
+  const snapshot = path.join(dir, 'truncated.db');
+  engine.backup(snapshot);
+  fs.truncateSync(snapshot, 200);
+  assert.throws(() => engine.restore(snapshot));
+  assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['original']);
+});
+
+test('restore reopens the original if the published database cannot be opened', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('snapshot')");
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.runSql("UPDATE notes SET body='original'");
+  const open = engine.open.bind(engine);
+  t.mock.method(engine, 'open', () => {
+    if (!engine.db) throw new Error('injected reopen failure');
+    return open();
+  });
+  assert.throws(() => engine.restore(snapshot), /reopen failure/);
+  t.mock.restoreAll();
+  assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['original']);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['snapshot.db', 'test.db']);
+});
+
+for (const invalid of ['not SQLite', '', 'SQLite format 3\0']) {
+  test(`restore preserves the original when input is invalid (${invalid.length} bytes)`, (t) => {
+    const { engine, dir } = makeEngine(t);
+    engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('original')");
+    const input = path.join(dir, 'invalid.db');
+    fs.writeFileSync(input, invalid);
+    assert.throws(() => engine.restore(input));
+    assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['original']);
+  });
+}
+
+test('restore refuses same-file paths and hardlink aliases', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('original')");
+  const alias = path.join(dir, 'alias.db');
+  fs.linkSync(engine.databasePath, alias);
+  for (const input of [engine.databasePath, alias]) assert.throws(() => engine.restore(input), /same|alias/i);
+  assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['original']);
+});
+
+test('restore refuses a busy WAL target and preserves peer committed rows', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('snapshot')");
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.runSql('PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;');
+  engine.open().exec('PRAGMA busy_timeout=50');
+  const peer = new DatabaseSync(engine.databasePath);
+  try {
+    peer.exec("INSERT INTO notes VALUES('peer'); BEGIN; SELECT * FROM notes;");
+    assert.throws(() => engine.restore(snapshot), /busy|locked|maintenance/i);
+    assert.deepEqual(peer.prepare('SELECT body FROM notes').all().map(row => row.body), ['snapshot', 'peer']);
+    assert.ok(fs.existsSync(engine.databasePath + '-wal'));
+    peer.exec('ROLLBACK');
+    assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['snapshot', 'peer']);
+  } finally { peer.close(); }
+});
+
+test('restore publication failure preserves the original and removes its stage', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('snapshot')");
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.runSql("UPDATE notes SET body='original'");
+  t.mock.method(fs, 'renameSync', () => { throw new Error('injected publication failure'); });
+  assert.throws(() => engine.restore(snapshot), /publication failure/);
+  assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['original']);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['snapshot.db', 'test.db']);
+});
+
+test('restore refuses orphan recovery sidecars instead of opening them with a new target', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql('CREATE TABLE notes(body TEXT)');
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.close();
+  fs.unlinkSync(engine.databasePath);
+  const journal = engine.databasePath + '-journal';
+  fs.writeFileSync(journal, 'recovery evidence');
+  assert.throws(() => engine.restore(snapshot), /recovery|maintenance|sidecar/i);
+  assert.equal(fs.readFileSync(journal, 'utf8'), 'recovery evidence');
+  assert.equal(fs.existsSync(engine.databasePath), false);
+});
+
+test('restore refuses symbolic aliases without changing the linked database', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('original')");
+  const alias = path.join(dir, 'symbolic.db');
+  try { fs.symlinkSync(engine.databasePath, alias); } catch (error) {
+    if (error.code !== 'EPERM') throw error;
+    t.skip('Windows symlink privilege unavailable');
+    return;
+  }
+  assert.throws(() => engine.restore(alias), /same|alias/i);
+  const linked = new SqliteEngine({ engine: 'sqlite', sqlite: { file: alias } });
+  try {
+    assert.throws(() => linked.restore(engine.databasePath), /symlink|alias/i);
+    assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['original']);
+  } finally { linked.close(); }
+});
+
+test('restore refuses an active rollback-journal reader without replacing its data', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('original')");
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.open().exec('PRAGMA busy_timeout=50');
+  const peer = new DatabaseSync(engine.databasePath);
+  try {
+    peer.exec('BEGIN; SELECT * FROM notes;');
+    assert.throws(() => engine.restore(snapshot), /busy|locked/i);
+    assert.deepEqual(peer.prepare('SELECT body FROM notes').all().map(row => row.body), ['original']);
+    peer.exec('ROLLBACK');
+  } finally { peer.close(); }
+});
+
+test('restore checkpoints its own WAL before replacing the target', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('snapshot')");
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.runSql("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE notes SET body='later WAL row'");
+  assert.equal(engine.restore(snapshot), engine.databasePath);
+  assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['snapshot']);
+  engine.close();
+  assert.deepEqual(engine.previewRows('notes').rows.map(row => row.body), ['snapshot']);
+});
+
+test('restore retains a readable recovery original if rollback publication also fails', (t) => {
+  const { engine, dir } = makeEngine(t);
+  engine.runSql("CREATE TABLE notes(body TEXT); INSERT INTO notes VALUES('snapshot')");
+  const snapshot = path.join(dir, 'snapshot.db');
+  engine.backup(snapshot);
+  engine.runSql("UPDATE notes SET body='original'");
+  const open = engine.open.bind(engine);
+  t.mock.method(engine, 'open', () => {
+    if (!engine.db) throw new Error('injected reopen failure');
+    return open();
+  });
+  const rename = fs.renameSync.bind(fs);
+  t.mock.method(fs, 'renameSync', (source, target) => {
+    if (path.basename(source) === 'original.db') throw new Error('injected rollback failure');
+    rename(source, target);
+  });
+  assert.throws(() => engine.restore(snapshot), AggregateError);
+  const recoveryDir = fs.readdirSync(dir).find(name => name.startsWith('.dbtk-restore-'));
+  assert.ok(recoveryDir);
+  const recovered = new DatabaseSync(path.join(dir, recoveryDir, 'original.db'), { readOnly: true });
+  try {
+    assert.deepEqual(recovered.prepare('SELECT body FROM notes').all().map(row => row.body), ['original']);
+  } finally { recovered.close(); }
+  assert.equal(fs.existsSync(engine.databasePath + '.dbtk-restore.lock'), false);
 });
