@@ -76,6 +76,9 @@ Management commands such as reset, restore, migrations, and row editing are not
 exposed by the new workspace. Existing CLI commands remain available. See
 [workspace details and limitations](docs/usage.md#local-workspace).
 
+For delivered features, verification boundaries, local demo setup, and the next
+priorities, see [remaining work and suggestions](REMAINING_AND_SUGGESTIONS.md).
+
 It is a **localhost-only development tool** bound to `127.0.0.1` — do not expose
 the port. The `ui`/`serve` commands cannot be triggered from the browser itself.
 

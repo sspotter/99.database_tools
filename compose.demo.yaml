@@ -1,0 +1,46 @@
+name: db-toolkit-demo
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: db-toolkit-demo-postgres
+    labels:
+      db-toolkit.demo: "true"
+    environment:
+      POSTGRES_USER: toolkit_demo
+      POSTGRES_PASSWORD: demo_password_local_only
+      POSTGRES_DB: toolkit_demo
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - postgres-demo:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U toolkit_demo -d toolkit_demo"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  mysql:
+    image: mysql:8.4
+    container_name: db-toolkit-demo-mysql
+    labels:
+      db-toolkit.demo: "true"
+    environment:
+      MYSQL_USER: toolkit_demo
+      MYSQL_PASSWORD: demo_password_local_only
+      MYSQL_DATABASE: toolkit_demo
+      MYSQL_ROOT_PASSWORD: demo_root_local_only
+    ports:
+      - "127.0.0.1:13306:3306"
+    volumes:
+      - mysql-demo:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u toolkit_demo toolkit_demo -e 'SELECT 1'"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+volumes:
+  postgres-demo:
+    labels:
+      db-toolkit.demo: "true"
+  mysql-demo:
+    labels:
+      db-toolkit.demo: "true"
