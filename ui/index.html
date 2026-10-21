@@ -1,106 +1,313 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Database Toolkit</title>
-    <link rel="stylesheet" href="styles.css" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      Database Toolkit · Workspace
+    </title>
+    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <a class="skip-link" href="#workspace">
+      Skip to workspace
+    </a>
     <header class="topbar">
       <div class="brand">
-        <span class="logo">DB</span>
-        <span>Database Toolkit</span>
+        <span class="logo">
+          DB
+        </span>
+        Database Toolkit
       </div>
-      <div class="engine-pill" id="enginePill">engine: …</div>
-      <div class="warn-banner">Localhost dev tool — do not expose this port.</div>
+      <span class="local-label">
+        Local workspace
+      </span>
+      <nav aria-label="Main navigation">
+        <button id="workspaceNav" class="active">
+          Workspace
+        </button>
+        <button id="dashboardNav">
+          Dashboard
+        </button>
+        <button id="logsNav">
+          Logs
+          <span id="errorCount">
+          </span>
+        </button>
+      </nav>
     </header>
-
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="dashboard">Dashboard</button>
-      <button class="tab" data-tab="commands">Commands</button>
-      <button class="tab" data-tab="tableview">Table View</button>
-      <button class="tab" data-tab="logs">Logs</button>
-      <button class="tab" data-tab="errors">Errors <span class="badge" id="errorBadge" hidden>0</span></button>
-    </nav>
-
-    <main>
-      <section class="panel active" id="dashboard">
-        <div class="panel-head">
-          <h2>Status</h2>
-          <button class="ghost" id="refreshBtn">Refresh</button>
+    <div class="app-shell">
+      <aside id="sidebar" class="sidebar" aria-label="Connections">
+        <div class="section-head">
+          <h1>
+            Connections
+          </h1>
+          <button id="addConnection" class="primary">
+            Add connection
+          </button>
         </div>
-        <div class="cards">
-          <div class="card">
-            <h3>Connection</h3>
-            <div id="connectionStatus" class="status">checking…</div>
+        <label class="search-label" for="connectionSearch">
+          Find a connection
+        </label>
+        <input id="connectionSearch" type="search" placeholder="Name, group, environment…">
+        <div class="sidebar-actions">
+          <button id="refreshConnections">
+            Refresh
+          </button>
+          <button id="importCurrent">
+            Add current configuration
+          </button>
+        </div>
+        <p id="persistenceNote" class="hint">
+        </p>
+        <div id="connectionList" class="connection-list" aria-live="polite">
+        </div>
+        <div id="explorer" class="explorer">
+        </div>
+      </aside>
+      <main id="workspace" tabindex="-1">
+        <div class="workspace-top">
+          <button id="sidebarToggle" aria-controls="sidebar" aria-expanded="false">
+            Connections
+          </button>
+          <div id="targetHeader" class="target-header">
+            No connection selected
           </div>
-          <div class="card">
-            <h3>Migrations</h3>
-            <div id="migrationsStatus" class="status">…</div>
+          <button id="newQuery" disabled>
+            New SQL tab
+          </button>
+        </div>
+        <div id="notice" role="status" aria-live="polite">
+        </div>
+        <section id="workspaceView">
+          <div id="workspaceTabs" class="workspace-tabs" role="tablist" aria-label="Open objects and queries">
           </div>
-          <div class="card">
-            <h3>Clients</h3>
-            <div id="toolsStatus" class="status">…</div>
+          <div id="tabContent" class="tab-content">
           </div>
-        </div>
-        <div class="card">
-          <h3>Tables</h3>
-          <ul id="tablesList" class="tables"><li class="muted">…</li></ul>
-        </div>
-      </section>
-
-      <section class="panel" id="commands">
-        <div class="panel-head"><h2>Commands</h2></div>
-        <div class="command-grid" id="commandGrid"></div>
-      </section>
-
-      <section class="panel" id="tableview">
-        <div class="panel-head">
-          <h2>Table View</h2>
-          <button class="ghost" id="tvRefreshBtn">Refresh tables</button>
-        </div>
-        <div class="tv-controls">
-          <select id="tvTableSelect"></select>
-          <label class="tv-limit">Limit
-            <input id="tvLimit" type="number" min="1" max="1000" value="100" />
-          </label>
-          <button class="run-btn" id="tvLoadBtn">Load rows</button>
-          <span class="tv-meta muted" id="tvMeta"></span>
-        </div>
-        <div class="tv-result" id="tvResult"><p class="muted">Pick a table and load its rows.</p></div>
-      </section>
-
-      <section class="panel" id="logs">
-        <div class="panel-head">
-          <h2>Logs</h2>
-          <button class="ghost" id="clearLogsBtn">Clear</button>
-        </div>
-        <pre class="console" id="logConsole"><span class="muted">No output yet. Run a command.</span></pre>
-      </section>
-
-      <section class="panel" id="errors">
-        <div class="panel-head">
-          <h2>Errors</h2>
-          <button class="ghost" id="clearErrorsBtn">Clear</button>
-        </div>
-        <div id="errorList"><p class="muted">No errors.</p></div>
-      </section>
-    </main>
-
-    <div class="modal-backdrop" id="modal" hidden>
-      <div class="modal">
-        <h3 id="modalTitle">Confirm</h3>
-        <p id="modalBody"></p>
-        <div class="modal-actions">
-          <button class="ghost" id="modalCancel">Cancel</button>
-          <button class="danger" id="modalConfirm">Run</button>
-        </div>
-      </div>
+        </section>
+        <section id="dashboardView" hidden>
+          <h2>
+            Workspace status
+          </h2>
+          <div id="dashboardContent">
+          </div>
+          <p class="hint">
+            Connections open only when you choose Connect. Browsing always uses read-only access. SQL runs against the target shown on its tab.
+          </p>
+          <p class="hint">
+            Management operations remain available through the CLI. Migration, restore and row editing are outside this workspace.
+          </p>
+        </section>
+        <section id="logsView" hidden>
+          <div class="section-head">
+            <h2>
+              Activity & errors
+            </h2>
+            <button id="clearLogs">
+              Clear logs
+            </button>
+          </div>
+          <p class="hint">
+            Connection credentials and SQL text are excluded from activity logs.
+          </p>
+          <div id="logConsole" class="console" role="log">
+          </div>
+        </section>
+      </main>
     </div>
-
-    <div class="toast-stack" id="toastStack"></div>
-
-    <script src="app.js"></script>
+    <dialog id="connectionDialog" aria-labelledby="connectionTitle">
+      <form id="connectionForm">
+        <div class="section-head">
+          <h2 id="connectionTitle">
+            Add connection
+          </h2>
+          <button type="button" id="closeConnection">
+            Close
+          </button>
+        </div>
+        <p class="hint">
+          Save a target first, then connect when you are ready. Testing does not save it.
+        </p>
+        <div class="form-grid">
+          <label>
+            Name
+            <input name="name" required maxlength="120" autocomplete="off">
+          </label>
+          <label>
+            Engine
+            <select name="engine">
+              <option value="sqlite">
+                SQLite
+              </option>
+              <option value="postgres">
+                PostgreSQL
+              </option>
+              <option value="mysql">
+                MySQL
+              </option>
+              <option value="mssql">
+                SQL Server
+              </option>
+            </select>
+          </label>
+          <label>
+            Group
+            <input name="group" maxlength="100" autocomplete="off" placeholder="Project or team">
+          </label>
+          <label>
+            Environment
+            <select name="environment">
+              <option value="development">
+                Development
+              </option>
+              <option value="test">
+                Test
+              </option>
+              <option value="staging">
+                Staging
+              </option>
+              <option value="production">
+                Production
+              </option>
+              <option value="local">
+                Local
+              </option>
+            </select>
+          </label>
+        </div>
+        <label id="entryModeLabel">
+          Enter connection using
+          <select name="entryMode">
+            <option value="fields">
+              Individual fields
+            </option>
+            <option value="url">
+              Connection URL
+            </option>
+          </select>
+        </label>
+        <div id="urlFields">
+          <label>
+            Connection URL
+            <input name="url" type="password" autocomplete="off" placeholder="postgresql://user:password@host/database">
+          </label>
+          <p class="hint">
+            Parsed by the server. Never stored in your browser.
+          </p>
+        </div>
+        <div id="sqliteFields">
+          <label>
+            Existing SQLite file path
+            <input name="file" autocomplete="off" placeholder="C:\data\project.sqlite">
+          </label>
+          <p class="hint">
+            Use an absolute path on this computer. Testing will not create a missing file.
+          </p>
+        </div>
+        <div id="serverFields" class="form-grid">
+          <label>
+            Host
+            <input name="host" autocomplete="off" placeholder="localhost">
+          </label>
+          <label>
+            Port
+            <input name="port" type="number" min="1" max="65535">
+          </label>
+          <label>
+            Database
+            <input name="database" autocomplete="off">
+          </label>
+          <label>
+            User
+            <input name="user" autocomplete="off">
+          </label>
+          <label class="full">
+            Password
+            <span id="passwordStatus" class="hint">
+            </span>
+            <span class="password-field">
+              <input name="password" type="password" autocomplete="new-password">
+              <button id="showPassword" type="button" aria-pressed="false">
+                Show
+              </button>
+            </span>
+          </label>
+          <label>
+            SSL mode
+            <select name="sslMode">
+              <option value="disable">
+                Disabled
+              </option>
+              <option value="require">
+                Required
+              </option>
+              <option value="verify-ca">
+                Verify certificate
+              </option>
+              <option value="verify-full" selected>
+                Verify certificate &amp; host
+              </option>
+            </select>
+          </label>
+          <label>
+            CA certificate path
+            <input name="sslCa" autocomplete="off" placeholder="Optional PEM path">
+          </label>
+        </div>
+        <div class="form-grid" id="credentialFields">
+          <label>
+            Credential storage
+            <select name="credentialMode">
+              <option value="session">
+                This server session only
+              </option>
+              <option value="saved">
+                Remember securely on this computer
+              </option>
+              <option value="none">
+                No password
+              </option>
+            </select>
+          </label>
+          <label id="passwordActionLabel">
+            Existing password
+            <select name="passwordAction">
+              <option value="keep">
+                Keep existing password
+              </option>
+              <option value="replace">
+                Replace with entered password
+              </option>
+              <option value="clear">
+                Forget password
+              </option>
+            </select>
+          </label>
+        </div>
+        <label class="check">
+          <input name="readOnly" type="checkbox" checked>
+          Read-only SQL
+        </label>
+        <p class="hint">
+          Turning this off allows SQL to change data. Read-only mode is not a sandbox for server functions.
+        </p>
+        <label class="check">
+          <input name="favorite" type="checkbox">
+          Favorite connection
+        </label>
+        <p id="formMessage" role="status" aria-live="polite">
+        </p>
+        <div class="form-actions">
+          <button type="button" id="testConnection">
+            Test connection
+          </button>
+          <button class="primary" type="submit">
+            Save connection
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <script src="app.js">
+    </script>
   </body>
 </html>

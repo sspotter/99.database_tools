@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { SqliteEngine } from '../lib/engines/sqlite.js';
 import { listSqlFiles } from '../lib/utils.js';
+import { spawnSync } from 'node:child_process';
 
 // Resolve the repo's real schema/migration files relative to this test file so
 // the suite runs regardless of the process cwd.
@@ -36,6 +37,21 @@ test('createDatabase reports creation only on first call', (t) => {
 
   const second = engine.createDatabase();
   assert.equal(second.created, false);
+});
+
+test('opening recovers committed WAL pages and retains durable journal settings', (t) => {
+  const { engine } = makeEngine(t);
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import { DatabaseSync } from 'node:sqlite';
+    const db = new DatabaseSync(process.argv[1]);
+    db.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE recovered(id INTEGER); INSERT INTO recovered VALUES(42)");
+    process.exit(0);
+  `, engine.databasePath], { encoding: 'utf8' });
+  assert.equal(child.status, 0, child.stderr);
+  assert.ok(fs.statSync(engine.databasePath + '-wal').size > 0);
+  assert.deepEqual(engine.open().prepare('SELECT id FROM recovered').all().map(r => r.id), [42]);
+  assert.equal(engine.open().prepare('PRAGMA journal_mode').get().journal_mode, 'wal');
+  assert.ok(engine.open().prepare('PRAGMA synchronous').get().synchronous >= 1);
 });
 
 test('listTables returns user tables sorted and excludes sqlite internal tables', (t) => {
