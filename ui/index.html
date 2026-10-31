@@ -6,70 +6,116 @@
     <title>
       Database Toolkit · Workspace
     </title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237db4ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='8' ry='3'/%3E%3Cpath d='M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5'/%3E%3Cpath d='M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="shell.css">
   </head>
   <body>
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <defs>
+        <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+        <symbol id="i-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M10 4v16"/></symbol>
+        <symbol id="i-view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-schema" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+        <symbol id="i-chevrons-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+        <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+        <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+        <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+        <symbol id="i-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+        <symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+        <symbol id="i-sql" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 13-2 2 2 2M15 13l2 2-2 2"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+        <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+        <symbol id="i-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+        <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></symbol>
+        <symbol id="i-plug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6"/><path d="M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></symbol>
+        <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+      </defs>
+    </svg>
     <a class="skip-link" href="#workspace">
       Skip to workspace
     </a>
     <header class="topbar">
+      <button id="sidebarToggle" class="icon-button" aria-controls="sidebar" aria-expanded="true" aria-label="Show or hide connections">
+        <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
       <div class="brand">
         <span class="logo">
-          DB
+          <svg class="icon" aria-hidden="true"><use href="#i-database"/></svg>
         </span>
         Database Toolkit
       </div>
       <span class="local-label">
         Local workspace
       </span>
-      <nav aria-label="Main navigation">
-        <button id="workspaceNav" class="active">
-          Workspace
-        </button>
-        <button id="dashboardNav">
-          Dashboard
-        </button>
-        <button id="logsNav">
-          Logs
-          <span id="errorCount">
-          </span>
-        </button>
-      </nav>
+      <button id="addConnection" class="primary add-button">
+        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+        <span class="btn-label">Add connection</span>
+      </button>
+      <button id="moreMenu" class="icon-button" aria-haspopup="menu" aria-expanded="false" aria-label="More actions">
+        <svg class="icon" aria-hidden="true"><use href="#i-more"/></svg>
+      </button>
     </header>
-    <div class="app-shell">
+    <div id="appShell" class="app-shell">
       <aside id="sidebar" class="sidebar" aria-label="Connections">
-        <div class="section-head">
+        <div class="sidebar-head">
           <h1>
             Connections
           </h1>
-          <button id="addConnection" class="primary">
-            Add connection
+          <div class="sidebar-head-actions">
+            <button id="addConnectionSmall" class="icon-button" aria-label="Add connection">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            </button>
+            <button id="collapseSidebar" class="icon-button" aria-label="Collapse connections" aria-expanded="true">
+              <svg class="icon" aria-hidden="true"><use href="#i-chevrons-left"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-scroll">
+          <label class="search-label" for="connectionSearch">
+            Find a connection
+          </label>
+          <input id="connectionSearch" type="search" placeholder="Name, group, environment…">
+          <p id="persistenceNote" class="hint">
+          </p>
+          <div id="connectionList" class="connection-list" aria-live="polite">
+          </div>
+          <div id="explorer" class="explorer">
+          </div>
+        </div>
+        <nav class="sidebar-nav" aria-label="Main navigation">
+          <button id="workspaceNav" class="active">
+            <svg class="icon" aria-hidden="true"><use href="#i-table"/></svg>
+            Workspace
           </button>
-        </div>
-        <label class="search-label" for="connectionSearch">
-          Find a connection
-        </label>
-        <input id="connectionSearch" type="search" placeholder="Name, group, environment…">
-        <div class="sidebar-actions">
-          <button id="refreshConnections">
-            Refresh
+          <button id="dashboardNav">
+            <svg class="icon" aria-hidden="true"><use href="#i-dashboard"/></svg>
+            Dashboard
           </button>
-          <button id="importCurrent">
-            Add current configuration
+          <button id="logsNav">
+            <svg class="icon" aria-hidden="true"><use href="#i-log"/></svg>
+            Logs
+            <span id="errorCount">
+            </span>
           </button>
-        </div>
-        <p id="persistenceNote" class="hint">
-        </p>
-        <div id="connectionList" class="connection-list" aria-live="polite">
-        </div>
-        <div id="explorer" class="explorer">
-        </div>
+          <button id="settingsNav">
+            <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>
+            Settings
+          </button>
+        </nav>
       </aside>
       <main id="workspace" tabindex="-1">
         <div class="workspace-top">
-          <button id="sidebarToggle" aria-controls="sidebar" aria-expanded="false">
-            Connections
-          </button>
           <div id="targetHeader" class="target-header">
             No connection selected
           </div>
@@ -113,8 +159,17 @@
           <div id="logConsole" class="console" role="log">
           </div>
         </section>
+        <section id="settingsView" hidden>
+          <h2>
+            Settings
+          </h2>
+          <div id="settingsContent">
+          </div>
+        </section>
       </main>
     </div>
+    <footer id="statusBar" class="statusbar" role="contentinfo">
+    </footer>
     <dialog id="connectionDialog" aria-labelledby="connectionTitle">
       <form id="connectionForm">
         <div class="section-head">
