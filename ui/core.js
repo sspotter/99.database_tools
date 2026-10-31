@@ -146,9 +146,13 @@ export function cancelOwner(owner) {
 }
 
 // ---- notices, logs, last run -------------------------------------------------------------------------------
+let noticeTimer;
 export function notice(message = '', error = false) {
-  $('notice').textContent = message;
-  $('notice').className = error ? 'error' : '';
+  const node = $('notice');
+  clearTimeout(noticeTimer);
+  node.textContent = message;
+  node.className = error ? 'error' : '';
+  if (message) noticeTimer = setTimeout(() => { node.textContent = ''; node.className = ''; }, error ? 12000 : 6000);
 }
 export function log(message, error = false) {
   const row = el('div', error ? 'error' : '', `${new Date().toLocaleTimeString()} · ${message}`);
