@@ -1,16 +1,25 @@
 :root{
   color-scheme:dark;
-  --bg:#0f1419;
-  --panel:#171d26;
-  --card:#1d2530;
-  --border:#344151;
-  --text:#e6edf3;
-  --muted:#a5b2c3;
-  --accent:#70b4ff;
-  --ok:#69d884;
-  --warn:#f0bf58;
-  --err:#ff928b;
-  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --bg:#0a111d;
+  --panel:#0f1828;
+  --card:#162235;
+  --border:#22314a;
+  --text:#e8eef8;
+  --muted:#93a6c0;
+  --accent:#2563eb;
+  --accent-text:#7db4ff;
+  --on-accent:#ffffff;
+  --ok:#3ecf7e;
+  --warn:#f2b83a;
+  --err:#ff7b72;
+  --info:#58a6ff;
+  --row-hover:#13203a;
+  --row-selected:#18305a;
+  --sidebar-w:300px;
+  --inspector-w:320px;
+  --topbar-h:60px;
+  --statusbar-h:34px;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:14px;
   color:var(--text);
   background:var(--bg)
@@ -42,7 +51,7 @@ button:hover{
 button.primary{
   background:var(--accent);
   border-color:var(--accent);
-  color:#071b2e;
+  color:var(--on-accent);
   font-weight:650
 }
 button.danger{
@@ -53,8 +62,8 @@ button:disabled{
   cursor:not-allowed
 }
 button.active{
-  color:var(--accent);
-  border-color:var(--accent)
+  color:var(--accent-text);
+  border-color:var(--accent-text)
 }
 input,select,textarea{
   min-width:0;
@@ -64,13 +73,13 @@ input,select,textarea{
   border-radius:5px;
   padding:8px 10px;
   color:var(--text);
-  caret-color:var(--accent)
+  caret-color:var(--accent-text)
 }
 input::placeholder,textarea::placeholder{
   color:var(--muted)
 }
 :focus-visible{
-  outline:2px solid var(--accent);
+  outline:2px solid var(--accent-text);
   outline-offset:3px
 }
 ::selection{
@@ -78,7 +87,7 @@ input::placeholder,textarea::placeholder{
   color:#fff
 }
 a{
-  color:var(--accent);
+  color:var(--accent-text);
   text-underline-offset:3px
 }
 [hidden]{
@@ -107,61 +116,16 @@ h3{
 .hint{
   max-width:74ch
 }
-.topbar{
-  height:61px;
-  display:flex;
-  align-items:center;
-  padding:0 20px;
-  gap:22px;
-  background:var(--panel);
-  border-bottom:1px solid var(--border)
-}
-.brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-size:16px;
-  font-weight:650;
-  white-space:nowrap
-}
 .logo{
   display:grid;
   place-items:center;
   width:30px;
   height:30px;
   border-radius:6px;
-  background:var(--accent);
-  color:#071b2e;
+  background:linear-gradient(135deg,#2563eb,#60a5fa);
+  color:#fff;
   font-size:12px;
   font-weight:800
-}
-.local-label{
-  color:var(--muted);
-  font-size:12px
-}
-.topbar nav{
-  display:flex;
-  margin-left:auto;
-  gap:6px
-}
-.topbar nav button{
-  background:transparent;
-  border-color:transparent
-}
-.topbar nav button.active{
-  color:var(--accent);
-  border-color:var(--border)
-}
-.app-shell{
-  display:grid;
-  grid-template-columns:300px minmax(0,1fr);
-  min-height:calc(100vh - 61px)
-}
-.sidebar{
-  padding:20px 16px;
-  background:var(--panel);
-  border-right:1px solid var(--border);
-  min-width:0
 }
 .section-head{
   display:flex;
@@ -274,10 +238,6 @@ h3{
 .object-list button:hover{
   background:var(--card)
 }
-main{
-  min-width:0;
-  padding:0 24px 24px
-}
 .workspace-top{
   min-height:76px;
   display:flex;
@@ -298,9 +258,6 @@ main{
 .target-header span{
   color:var(--muted);
   font-size:12px
-}
-#sidebarToggle{
-  display:none
 }
 #notice:not(:empty){
   padding:12px;
@@ -582,87 +539,15 @@ dialog label.check{
 .skip-link:focus{
   top:10px
 }
-@media(max-width:900px){
-  .app-shell{
-    grid-template-columns:260px minmax(0,1fr)
-  }
-  main{
-    padding:0 16px 20px
-  }
-  .local-label{
-    display:none
-  }
-  .sidebar{
-    padding:16px 12px
-  }
-  .section-head{
-    flex-wrap:wrap
-  }
-  .workspace-top{
-    gap:10px
-  }
-}
 @media(max-width:680px){
-  .topbar{
-    height:auto;
-    min-height:60px;
-    padding:12px;
-    gap:12px;
-    flex-wrap:wrap
-  }
-  .brand{
-    font-size:14px
-  }
-  .topbar nav{
-    gap:2px
-  }
-  .topbar nav button{
-    font-size:12px;
-    padding:6px
-  }
-  .app-shell{
-    display:block
-  }
-  .sidebar{
-    display:none;
-    border-right:0;
-    border-bottom:1px solid var(--border)
-  }
-  .sidebar.open{
-    display:block
-  }
-  #sidebarToggle{
-    display:block;
-    font-size:12px
-  }
-  .workspace-top{
-    flex-wrap:wrap;
-    padding:12px 0
-  }
-  .target-header{
-    order:3;
-    flex-basis:100%
-  }
-  #newQuery{
-    margin-left:auto
-  }
-  .empty-state{
-    margin-top:50px
-  }
   .form-grid{
     grid-template-columns:1fr
   }
   .full{
     grid-column:auto
   }
-  .data-table-wrap{
-    max-height:50vh
-  }
   dialog{
     padding:18px
-  }
-  .tab-tools{
-    gap:6px
   }
 }
 @media(prefers-reduced-motion:no-preference){
