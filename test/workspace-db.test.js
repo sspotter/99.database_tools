@@ -42,7 +42,7 @@ test('SQLite explorer preserves literal dotted object names and returns metadata
   const info = await runDatabaseTask(p, { action: 'inspect', schema: 'main', table: 'literal.dot' });
   assert.equal(info.columns[0].name, 'id');
   assert.equal(info.columns[0].primaryKey, true);
-  assert.equal(info.indexes[0].name, 'body_idx');
+  assert.ok(info.indexes.some((index) => index.name === 'body_idx' && index.columns[0] === 'body'));
   assert.match(info.definition, /CREATE TABLE/);
 });
 
@@ -219,6 +219,55 @@ test('new actions are registered; count requires a table; unknown actions are re
   assert.deepEqual([caps.count, caps.catalog, caps.serverInfo], [true, true, true]);
   await assert.rejects(runDatabaseTask(p, { action: 'count' }), /Table is required/);
   await assert.rejects(runDatabaseTask(p, { action: 'bogus' }), /Unsupported database action/);
+});
+
+function relational(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-rel-'));
+  const file = path.join(dir, 'rel.db');
+  const db = new DatabaseSync(file);
+  db.exec(`CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+    CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers, status TEXT, total NUMERIC);
+    CREATE INDEX idx_orders_customer ON orders(customer_id);
+    INSERT INTO customers VALUES (1,'a'),(2,'b');
+    INSERT INTO orders VALUES (1,1,'paid',10),(2,1,'pending',20),(3,2,'paid',30);
+    CREATE VIEW order_totals AS SELECT customer_id, SUM(total) AS total FROM orders GROUP BY customer_id;`);
+  db.close();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return { engine: 'sqlite', readOnly: true, settings: { file } };
+}
+
+test('SQLite inspect is normalized: implicit FK target resolved, synthetic primary key first', async (t) => {
+  const p = relational(t);
+  const info = await runDatabaseTask(p, { action: 'inspect', schema: 'main', table: 'orders' });
+  assert.deepEqual(info.primaryKey, ['id']);
+  assert.deepEqual(info.foreignKeys, [{ name: null, column: 'customer_id', referencedSchema: 'main', referencedTable: 'customers', referencedColumn: 'id' }]);
+  assert.deepEqual(info.indexes.map((i) => [i.name, i.primary]), [['PRIMARY KEY', true], ['idx_orders_customer', false]]);
+  assert.equal(info.columns.find((c) => c.name === 'customer_id').foreignKey, true);
+});
+
+test('SQLite count shares the row filter, handles NULL filters, views, and unknown columns', async (t) => {
+  const p = relational(t);
+  const count = (extra = {}) => runDatabaseTask(p, { action: 'count', schema: 'main', table: 'orders', ...extra });
+  assert.deepEqual(await count(), { total: 3, exact: true });
+  assert.deepEqual(await count({ filterColumn: 'status', filterValue: 'paid' }), { total: 2, exact: true });
+  assert.deepEqual(await count({ filterColumn: 'status', filterValue: null }), { total: 0, exact: true });
+  await assert.rejects(count({ filterColumn: 'nope', filterValue: 1 }), /Unknown column/);
+  assert.deepEqual(await runDatabaseTask(p, { action: 'count', table: 'order_totals' }), { total: 2, exact: true });
+});
+
+test('SQLite serverInfo and catalog', async (t) => {
+  const p = relational(t);
+  const info = await runDatabaseTask(p, { action: 'serverInfo' });
+  assert.equal(info.product, 'SQLite');
+  assert.match(info.version, /^\d+\.\d+/);
+  assert.deepEqual(await runDatabaseTask(p, { action: 'catalog' }), {
+    schemas: [{ name: 'main', objects: [
+      { schema: 'main', name: 'customers', type: 'table' },
+      { schema: 'main', name: 'order_totals', type: 'view' },
+      { schema: 'main', name: 'orders', type: 'table' },
+    ] }],
+    defaultSchema: 'main',
+  });
 });
 
 test('SQL Server qualified sources support write aliases and scoped CTE references', () => {
