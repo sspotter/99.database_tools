@@ -213,6 +213,14 @@ test('SQL Server aliases cannot exempt physical sources or leak into sibling que
   }
 });
 
+test('new actions are registered; count requires a table; unknown actions are rejected', async (t) => {
+  const p = fixture(t);
+  const caps = getCapabilities('sqlite');
+  assert.deepEqual([caps.count, caps.catalog, caps.serverInfo], [true, true, true]);
+  await assert.rejects(runDatabaseTask(p, { action: 'count' }), /Table is required/);
+  await assert.rejects(runDatabaseTask(p, { action: 'bogus' }), /Unsupported database action/);
+});
+
 test('SQL Server qualified sources support write aliases and scoped CTE references', () => {
   for (const sql of [
     'SELECT * FROM analytics.users AS users',
