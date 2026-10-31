@@ -37,10 +37,30 @@ services:
       interval: 3s
       timeout: 5s
       retries: 60
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: db-toolkit-demo-mssql
+    labels:
+      db-toolkit.demo: "true"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Demo_password_1!"
+    ports:
+      - "127.0.0.1:11433:1433"
+    volumes:
+      - mssql-demo:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
 volumes:
   postgres-demo:
     labels:
       db-toolkit.demo: "true"
   mysql-demo:
+    labels:
+      db-toolkit.demo: "true"
+  mssql-demo:
     labels:
       db-toolkit.demo: "true"
