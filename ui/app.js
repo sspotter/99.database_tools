@@ -1,86 +1,18 @@
-const tokenStorageKey = 'database-toolkit-token:' + location.origin;
-const pageUrl = new URL(location.href);
-let token = pageUrl.searchParams.get('token') || '';
-try {
-  if (token) sessionStorage.setItem(tokenStorageKey, token);
-  else token = sessionStorage.getItem(tokenStorageKey) || '';
-} catch { /* Token remains in memory if browser storage is disabled. */ }
-if (pageUrl.searchParams.has('token')) {
-  pageUrl.searchParams.delete('token');
-  history.replaceState(null, '', pageUrl.pathname + pageUrl.search + pageUrl.hash);
-}
-const $ = (id) => document.getElementById(id);
+import { $, el, button, option, label, api, workspaceRequest, state, notice, log, fail, safeStorage, profileById, selected, activeTab, endpoint, environment, capability, targetText, saveHistory, recordHistory } from './core.js';
+
 const form = $('connectionForm');
 const fields = form.elements;
-const state = { profiles: [], profilesVersion: 0, capabilities: {}, selectedId: null, connected: new Set(), pendingConnections: new Set(), navigation: null, navigationVersion: 0, tabs: [], activeTab: null, editing: null, errors: 0, history: [], persistHistory: false, persistence: '' };
-const HISTORY_KEY = 'database-toolkit-query-history-v1';
-const HISTORY_OPT_IN = 'database-toolkit-history-enabled';
 const TABS_KEY = 'database-toolkit-tabs-v1';
 const RECENTS_KEY = 'database-toolkit-recents-v1';
 let savedTabs = [];
 let tabsRestored = false;
 let recentProfiles = [];
 let objectSearch = '';
-try {
-  state.persistHistory = localStorage.getItem(HISTORY_OPT_IN) === 'true';
-  if (state.persistHistory) {
-    const stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    if (Array.isArray(stored)) state.history = stored.filter((item) => item && typeof item.sql === 'string' && typeof item.profileId === 'string').slice(0, 100);
-  }
-  const restored = JSON.parse(localStorage.getItem(TABS_KEY) || '[]');
-  if (Array.isArray(restored)) savedTabs = restored.slice(0, 30);
-  const recents = JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
-  if (Array.isArray(recents)) recentProfiles = recents.filter((id) => typeof id === 'string').slice(0, 8);
-} catch { /* Browser storage may be disabled. Session history remains available. */ }
+const restoredTabs = safeStorage.get(TABS_KEY, []);
+if (Array.isArray(restoredTabs)) savedTabs = restoredTabs.slice(0, 30);
+const recents = safeStorage.get(RECENTS_KEY, []);
+if (Array.isArray(recents)) recentProfiles = recents.filter((id) => typeof id === 'string').slice(0, 8);
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined && text !== null) node.textContent = String(text);
-  return node;
-}
-function button(text, action, className = '', disabled = false) {
-  const node = el('button', className, text);
-  node.type = 'button';
-  node.disabled = disabled;
-  node.addEventListener('click', action);
-  return node;
-}
-function option(value, text = value) {
-  const node = el('option', '', text);
-  node.value = value;
-  return node;
-}
-function label(text, control) {
-  const node = el('label', '', text);
-  node.append(control);
-  return node;
-}
-async function api(path, body) {
-  const response = await fetch(path, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: { 'content-type': 'application/json', 'x-ui-token': token },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    cache: 'no-store',
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
-  return data;
-}
-function notice(message = '', error = false) {
-  $('notice').textContent = message;
-  $('notice').className = error ? 'error' : '';
-}
-function log(message, error = false) {
-  const row = el('div', error ? 'error' : '', `${new Date().toLocaleTimeString()} · ${message}`);
-  $('logConsole').prepend(row);
-  while ($('logConsole').children.length > 200) $('logConsole').lastChild.remove();
-  if (error) $('errorCount').textContent = `(${++state.errors})`;
-}
-function fail(error, context) {
-  notice(`${context}: ${error.message}`, true);
-  log(`${context}: ${error.message}`, true);
-}
 function showView(view) {
   for (const name of ['workspace', 'dashboard', 'logs']) {
     $(name + 'View').hidden = name !== view;
@@ -89,14 +21,6 @@ function showView(view) {
   if (view === 'dashboard') renderDashboard();
   if (view === 'logs') { state.errors = 0; $('errorCount').textContent = ''; }
 }
-function profileById(id) { return state.profiles.find((profile) => profile.id === id); }
-function selected() { return profileById(state.selectedId); }
-function endpoint(profile, action) { return `/api/connections/${encodeURIComponent(profile.id)}/${action}`; }
-function targetText(target) {
-  return [target.profile.name, target.database || target.profile.settings?.file || target.profile.settings?.database, target.schema, target.table].filter(Boolean).join(' / ');
-}
-function environment(profile) { return profile.environment || 'development'; }
-function capability(profile, key) { return state.capabilities[profile.engine]?.[key] === true; }
 function tabBlockReason(tab) {
   const current = profileById(tab.profile.id);
   if (!current) return 'This connection was deleted. Open a tab from another saved connection.';
@@ -119,8 +43,7 @@ function invalidateTabs() {
 function rememberTabLocations() {
   if (!tabsRestored) return;
   const locations = state.tabs.map((tab) => ({ profileId: tab.profile.id, revision: tab.profile.revision, database: tab.database, schema: tab.schema, table: tab.table, kind: tab.kind }));
-  try { localStorage.setItem(TABS_KEY, JSON.stringify(locations)); }
-  catch { /* Tabs still work for this session without browser storage. */ }
+  safeStorage.set(TABS_KEY, locations);
 }
 function restoreTabLocations() {
   if (tabsRestored) return;
@@ -136,8 +59,7 @@ function restoreTabLocations() {
 }
 function rememberRecent(id) {
   recentProfiles = [id, ...recentProfiles.filter((previous) => previous !== id)].slice(0, 8);
-  try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recentProfiles)); }
-  catch { /* Connection navigation does not depend on storage. */ }
+  safeStorage.set(RECENTS_KEY, recentProfiles);
 }
 async function refreshProfiles() {
   const version = ++state.profilesVersion;
@@ -249,9 +171,7 @@ async function favorite(profile) {
 async function deleteConnection(profile) {
   if (!confirm(`Delete "${profile.name}"? Its open tabs will be disabled. The database itself will not be deleted.`)) return;
   try {
-    const response = await fetch(`/api/connections/${encodeURIComponent(profile.id)}`, { method: 'DELETE', headers: { 'content-type': 'application/json', 'x-ui-token': token }, body: JSON.stringify({ revision: profile.revision }) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Delete failed.');
+    await api(`/api/connections/${encodeURIComponent(profile.id)}`, { revision: profile.revision }, 'DELETE');
     await refreshProfiles(); notice('Connection removed.'); log('Removed a connection profile.');
   } catch (error) { fail(error, 'Could not delete connection'); }
 }
@@ -326,13 +246,6 @@ async function submitConnection(test) {
     $('formMessage').className = 'error';
     // Form errors intentionally stay out of logs: unsaved values can include secrets.
   } finally { controls.forEach((control) => { control.disabled = false; }); }
-}
-async function workspaceRequest(target, task, requestId = crypto.randomUUID()) {
-  const requestTask = { ...task };
-  for (const key of ['database', 'schema', 'table', 'sortColumn', 'filterColumn']) {
-    if (requestTask[key] === '') delete requestTask[key];
-  }
-  return api('/api/workspace', { profileId: target.profile.id, revision: target.profile.revision, requestId, task: requestTask });
 }
 async function loadNavigation(initialDatabases) {
   const profile = selected();
@@ -425,7 +338,6 @@ function openQuery() {
   state.tabs.push(tab); state.activeTab = tab.id;
   showView('workspace'); renderTabs(); renderTab();
 }
-function activeTab() { return state.tabs.find((tab) => tab.id === state.activeTab); }
 function renderTabs() {
   rememberTabLocations();
   const root = $('workspaceTabs'); root.replaceChildren();
@@ -605,19 +517,6 @@ function exportResult(tab, format) {
   const content = format === 'json' ? JSON.stringify(data.rows || [], null, 2) : [data.columns.map(csvCell).join(','), ...(data.rows || []).map((row) => data.columns.map((column) => csvCell(row[column])).join(','))].join('\r\n');
   const url = URL.createObjectURL(new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8' }));
   const anchor = el('a'); anchor.href = url; anchor.download = `loaded-${(tab.table || 'query').replace(/[^a-z0-9_-]/gi, '_')}.${format}`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function saveHistory() {
-  try {
-    localStorage.setItem(HISTORY_OPT_IN, String(state.persistHistory));
-    if (state.persistHistory) localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history));
-    else localStorage.removeItem(HISTORY_KEY);
-  } catch { notice('Browser storage is unavailable. Query history is retained for this session only.'); state.persistHistory = false; }
-}
-function recordHistory(tab) {
-  // Never retain URL credentials or password-setting statements in SQL history.
-  if (/:\/\/[^\s]*@|\b(password|identified\s+by|secret|token)\b/i.test(tab.sql)) return;
-  state.history.unshift({ profileId: tab.profile.id, database: tab.database, schema: tab.schema, sql: tab.sql, at: new Date().toISOString() });
-  state.history = state.history.slice(0, 100); saveHistory();
 }
 function renderHistory(tab, root) {
   const section = el('details', 'history');
