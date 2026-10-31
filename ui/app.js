@@ -1,4 +1,5 @@
-import { $, el, button, option, label, api, workspaceRequest, state, notice, log, fail, safeStorage, profileById, selected, activeTab, endpoint, environment, capability, targetText, saveHistory, recordHistory } from './core.js';
+import { $, el, button, option, label, api, workspaceRequest, state, bus, actions, notice, log, fail, safeStorage, profileById, selected, activeTab, endpoint, environment, capability, targetText, recordRun, saveHistory, recordHistory } from './core.js';
+import { initShell, showView } from './shell.js';
 
 const form = $('connectionForm');
 const fields = form.elements;
@@ -13,14 +14,6 @@ if (Array.isArray(restoredTabs)) savedTabs = restoredTabs.slice(0, 30);
 const recents = safeStorage.get(RECENTS_KEY, []);
 if (Array.isArray(recents)) recentProfiles = recents.filter((id) => typeof id === 'string').slice(0, 8);
 
-function showView(view) {
-  for (const name of ['workspace', 'dashboard', 'logs']) {
-    $(name + 'View').hidden = name !== view;
-    $(name + 'Nav').classList.toggle('active', name === view);
-  }
-  if (view === 'dashboard') renderDashboard();
-  if (view === 'logs') { state.errors = 0; $('errorCount').textContent = ''; }
-}
 function tabBlockReason(tab) {
   const current = profileById(tab.profile.id);
   if (!current) return 'This connection was deleted. Open a tab from another saved connection.';
@@ -70,12 +63,14 @@ async function refreshProfiles() {
     state.capabilities = data.capabilities || {};
     state.persistence = data.credentialPersistence;
     state.connected = new Set(state.profiles.filter((profile) => profile.connected).map((profile) => profile.id));
+    state.serverInfo = Object.fromEntries(state.profiles.filter((profile) => profile.serverInfo).map((profile) => [profile.id, profile.serverInfo]));
     restoreTabLocations();
     $('persistenceNote').textContent = data.credentialPersistence === 'windows-dpapi' ? 'Remembered passwords are protected by your Windows account.' : 'Password persistence is unavailable. Use session-only credentials.';
     fields.credentialMode.querySelector('[value="saved"]').disabled = data.credentialPersistence !== 'windows-dpapi';
     if (state.selectedId && !selected()) { state.selectedId = null; state.navigation = null; state.navigationVersion++; }
     if (state.navigation && (!selected() || state.navigation.profile.revision !== selected().revision || !state.connected.has(state.selectedId))) { state.navigation = null; state.navigationVersion++; }
     renderProfiles(); renderExplorer(); renderHeader(); invalidateTabs();
+    bus.emit('profiles');
   } catch (error) { if (version === state.profilesVersion) fail(error, 'Could not load connections'); }
 }
 function renderProfiles() {
@@ -121,13 +116,6 @@ function renderHeader() {
   root.append(heading, el('span', '', `${profile.engine} · ${profile.readOnly ? 'Read-only SQL' : 'Writable SQL'} · ${state.connected.has(profile.id) ? 'Connected' : 'Disconnected'}`));
   $('newQuery').disabled = !state.connected.has(profile.id) || !state.navigation || state.navigation.busy || !!state.navigation.error;
 }
-function renderDashboard() {
-  const root = $('dashboardContent');
-  root.replaceChildren();
-  for (const [name, value] of [['Saved connections', state.profiles.length], ['Connected', state.connected.size], ['Open tabs', state.tabs.length], ['Credential storage', state.persistence === 'windows-dpapi' ? 'Windows account encryption' : 'Session only']]) {
-    const row = el('div', 'status-row'); row.append(el('span', '', name), el('strong', '', value)); root.append(row);
-  }
-}
 function selectProfile(id) {
   const changed = state.selectedId !== id;
   state.selectedId = id;
@@ -148,11 +136,13 @@ async function toggleConnection(profile) {
     const result = await api(endpoint(profile, disconnect ? 'disconnect' : 'connect'), { revision: profile.revision });
     if (disconnect) {
       state.connected.delete(profile.id);
+      delete state.serverInfo[profile.id];
       if (state.selectedId === profile.id) { state.navigation = null; state.navigationVersion++; }
       invalidateTabs(); renderProfiles(); renderExplorer(); renderHeader();
       notice('Disconnected. Session-only credentials were cleared.');
     } else {
       state.connected.add(profile.id);
+      if (result.serverInfo) state.serverInfo[profile.id] = result.serverInfo;
       renderProfiles(); renderHeader();
       if (state.selectedId === profile.id) {
         state.navigation = null;
@@ -162,7 +152,7 @@ async function toggleConnection(profile) {
     }
     log(`${disconnect ? 'Disconnected from' : 'Connected to'} ${profile.name}.`);
   } catch (error) { fail(error, disconnect ? 'Disconnect failed' : 'Connection failed'); }
-  finally { state.pendingConnections.delete(profile.id); renderProfiles(); renderTabs(); renderTab(); }
+  finally { state.pendingConnections.delete(profile.id); renderProfiles(); renderTabs(); renderTab(); bus.emit('profiles'); }
 }
 async function favorite(profile) {
   try { await api('/api/connections', { ...profile, favorite: !profile.favorite }); await refreshProfiles(); }
@@ -359,6 +349,7 @@ function renderTabs() {
     const close = button('Close', () => closeTab(tab), 'close-tab'); close.setAttribute('aria-label', `Close ${title}`);
     item.append(select, close); root.append(item);
   }
+  bus.emit('tabs');
 }
 function closeTab(tab) {
   tab.generation++;
@@ -426,6 +417,7 @@ async function executeTab(tab, inspect = false) {
   if (tab.busy || tabBlockReason(tab)) return;
   if (tab.kind === 'query' && !tab.sql.trim()) { tab.error = 'Enter one SQL statement first.'; renderTab(); return; }
   const generation = ++tab.generation;
+  const started = performance.now();
   const requestId = crypto.randomUUID();
   tab.requestId = requestId; tab.busy = true; tab.error = '';
   if (!inspect) { tab.inspect = false; tab.data = null; }
@@ -442,10 +434,13 @@ async function executeTab(tab, inspect = false) {
     if (generation !== tab.generation || !state.tabs.includes(tab) || tabBlockReason(tab)) return;
     if (inspect) tab.metadata = data;
     else tab.data = data;
+    recordRun(true, data.durationMs ?? performance.now() - started, inspect ? 'Inspection completed' : tab.kind === 'query' ? 'Query completed' : 'Rows loaded');
     log(`${inspect ? 'Inspected' : tab.kind === 'query' ? 'Ran query against' : 'Loaded rows from'} ${targetText(tab)}.`);
   } catch (error) {
     if (generation !== tab.generation || !state.tabs.includes(tab)) return;
-    tab.error = error.message; log(`Database request failed for ${targetText(tab)}: ${error.message}`, true);
+    tab.error = error.message;
+    recordRun(false, 0, 'Request');
+    log(`Database request failed for ${targetText(tab)}: ${error.message}`, true);
   } finally {
     if (generation === tab.generation) { tab.requestId = null; tab.busy = false; if (state.activeTab === tab.id) renderTab(); }
   }
@@ -532,22 +527,23 @@ function renderHistory(tab, root) {
   }
   root.append(section);
 }
-for (const name of ['workspace', 'dashboard', 'logs']) $(name + 'Nav').addEventListener('click', () => showView(name));
-$('addConnection').addEventListener('click', () => openConnection());
 $('closeConnection').addEventListener('click', () => $('connectionDialog').close());
 $('connectionDialog').addEventListener('close', () => { fields.password.value = ''; fields.url.value = ''; });
 $('connectionSearch').addEventListener('input', renderProfiles);
-$('refreshConnections').addEventListener('click', refreshProfiles);
 $('newQuery').addEventListener('click', openQuery);
 $('clearLogs').addEventListener('click', () => { $('logConsole').replaceChildren(); state.errors = 0; $('errorCount').textContent = ''; });
-$('sidebarToggle').addEventListener('click', () => { const open = $('sidebar').classList.toggle('open'); $('sidebarToggle').setAttribute('aria-expanded', String(open)); });
 for (const name of ['engine', 'entryMode', 'credentialMode', 'passwordAction']) fields[name].addEventListener('change', syncConnectionForm);
 $('showPassword').addEventListener('click', () => { const show = fields.password.type === 'password'; fields.password.type = show ? 'text' : 'password'; $('showPassword').textContent = show ? 'Hide' : 'Show'; $('showPassword').setAttribute('aria-pressed', String(show)); });
 $('testConnection').addEventListener('click', () => submitConnection(true));
 form.addEventListener('submit', (event) => { event.preventDefault(); submitConnection(false); });
-$('importCurrent').addEventListener('click', async () => {
+$('addConnection').addEventListener('click', () => openConnection());
+$('addConnectionSmall').addEventListener('click', () => openConnection());
+actions.refreshProfiles = refreshProfiles;
+actions.openConnection = openConnection;
+actions.importCurrent = async () => {
   if (!confirm('Add the project’s current configuration as a saved connection? This explicitly reads its configuration. It will not connect automatically.')) return;
   try { await api('/api/connections/import-current', {}); await refreshProfiles(); notice('Current configuration added. Select it and choose Connect when ready.'); }
   catch (error) { fail(error, 'Configuration import failed'); }
-});
+};
+initShell();
 renderTabs(); renderTab(); refreshProfiles();
