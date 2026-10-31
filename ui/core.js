@@ -1,4 +1,5 @@
 import { createSettings } from './settings.js';
+import { engineMeta } from './format.js';
 
 // ---- token: kept in tab-scoped session storage, removed from the address bar -------------------------------
 const tokenStorageKey = 'database-toolkit-token:' + location.origin;
@@ -198,6 +199,38 @@ export function popover(anchor, content, { onClose, align = 'start' } = {}) {
   };
   openPopover = handle;
   return handle;
+}
+
+export function engineBadge(engine) {
+  const meta = engineMeta(engine);
+  const node = el('span', `engine-badge engine-${engine}`, meta.code);
+  node.title = meta.name;
+  node.setAttribute('aria-hidden', 'true');
+  return node;
+}
+
+export function menuItem(text, iconName, onSelect, { danger = false, disabled = false } = {}) {
+  const node = el('button', `menu-item${danger ? ' danger' : ''}`);
+  node.type = 'button';
+  node.disabled = disabled;
+  node.setAttribute('role', 'menuitem');
+  if (iconName) node.append(icon(iconName));
+  node.append(el('span', '', text));
+  node.addEventListener('click', onSelect);
+  return node;
+}
+
+// Up/Down/Home/End move focus between enabled menu items.
+export function menuKeys(menu) {
+  menu.addEventListener('keydown', (event) => {
+    const items = [...menu.querySelectorAll('[role="menuitem"]:not(:disabled)')];
+    if (!items.length) return;
+    const index = items.indexOf(document.activeElement);
+    const next = { ArrowDown: (index + 1) % items.length, ArrowUp: (index - 1 + items.length) % items.length, Home: 0, End: items.length - 1 }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    items[next].focus();
+  });
 }
 
 // ---- SQL history (session-only unless the user opts in; secrets are never stored) --------------------------
