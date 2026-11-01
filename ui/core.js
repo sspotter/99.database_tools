@@ -65,7 +65,7 @@ export const state = {
   connected: new Set(), pendingConnections: new Set(),
   databasesByProfile: {}, catalogs: {}, serverInfo: {}, target: null, expanded: new Set(),
   tabs: [], activeTab: null, editing: null, errors: 0,
-  history: [], persistHistory: false, view: 'workspace', lastRun: null,
+  history: [], persistHistory: false, view: 'workspace', lastRun: null, inspectorDrawer: false,
 };
 const listeners = new Map();
 export const bus = {
