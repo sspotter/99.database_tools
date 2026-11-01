@@ -100,6 +100,7 @@ export function renderToolbar(tab, root, blocked) {
   refresh.addEventListener('click', () => actions.refreshTab(tab));
   const panel = el('button', `tool icon-only${inspectorVisible() ? ' active' : ''}`);
   panel.type = 'button';
+  panel.dataset.role = 'inspector-toggle';
   panel.setAttribute('aria-label', 'Show table details');
   panel.setAttribute('aria-pressed', String(inspectorVisible()));
   panel.title = 'Table details';

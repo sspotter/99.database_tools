@@ -16,6 +16,8 @@ export function toggleInspector() {
   renderInspector();
   const tab = activeTab();
   if (tab) actions.paint(tab, ['toolbar']);
+  // Closing (via the drawer's ✕ or by re-toggling) rebuilds the toolbar, dropping focus to <body>; send it back to the toggle.
+  if (!inspectorVisible()) $('tabContent')?.querySelector('[data-role="inspector-toggle"]')?.focus();
 }
 
 const chip = (text) => el('span', 'chip', text);
