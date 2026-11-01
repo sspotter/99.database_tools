@@ -85,5 +85,6 @@ export function initShell() {
   });
 
   for (const name of ['status', 'profiles', 'tabs', 'target', 'view']) bus.on(name, renderStatusBar);
+  bus.on('profiles', () => { if (state.view === 'dashboard') renderDashboard(); });
   renderStatusBar();
 }
