@@ -36,6 +36,7 @@
 .header-line{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .crumbs{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap;font-size:16px}
 .crumb{color:var(--text)}
+.crumb.environment-production{color:var(--warn)}
 .crumb.current{font-weight:700}
 .crumb-sep{color:var(--muted)}
 .header-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
