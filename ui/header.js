@@ -1,4 +1,4 @@
-import { $, el, option, label, icon, engineBadge, state, bus, actions, activeTab, profileById, selected, environment } from './core.js';
+import { $, el, option, label, engineBadge, state, bus, actions, activeTab, profileById, selected, environment } from './core.js';
 import { levelsFor, catalogKey } from './models.js';
 import { chooseDatabase, chooseSchema } from './nav.js';
 import { baseName } from './format.js';

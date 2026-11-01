@@ -64,7 +64,6 @@ export const state = {
   profiles: [], profilesVersion: 0, capabilities: {}, persistence: '', selectedId: null,
   connected: new Set(), pendingConnections: new Set(),
   databasesByProfile: {}, catalogs: {}, serverInfo: {}, target: null, expanded: new Set(),
-  navigation: null, navigationVersion: 0, // legacy explorer state — removed in phase 4
   tabs: [], activeTab: null, editing: null, errors: 0,
   history: [], persistHistory: false, view: 'workspace', lastRun: null,
 };

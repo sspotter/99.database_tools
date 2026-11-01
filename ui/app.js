@@ -1,18 +1,17 @@
-import { $, el, button, option, label, api, workspaceRequest, state, bus, actions, notice, log, fail, safeStorage, profileById, selected, activeTab, endpoint, environment, capability, targetText, recordRun, saveHistory, recordHistory } from './core.js';
+import { $, el, button, option, label, api, state, bus, actions, notice, log, fail, safeStorage, profileById, selected, activeTab, endpoint, environment, capability, targetText, recordRun, saveHistory, recordHistory, workspaceRequest } from './core.js';
 import { initShell, showView } from './shell.js';
+import { initNav, syncProfiles, activateConnection, syncTargetFromTab } from './nav.js';
+import { initTree } from './tree.js';
+import { initHeader } from './header.js';
+import { nodeKey } from './models.js';
 
 const form = $('connectionForm');
 const fields = form.elements;
 const TABS_KEY = 'database-toolkit-tabs-v1';
-const RECENTS_KEY = 'database-toolkit-recents-v1';
 let savedTabs = [];
 let tabsRestored = false;
-let recentProfiles = [];
-let objectSearch = '';
 const restoredTabs = safeStorage.get(TABS_KEY, []);
 if (Array.isArray(restoredTabs)) savedTabs = restoredTabs.slice(0, 30);
-const recents = safeStorage.get(RECENTS_KEY, []);
-if (Array.isArray(recents)) recentProfiles = recents.filter((id) => typeof id === 'string').slice(0, 8);
 
 function tabBlockReason(tab) {
   const current = profileById(tab.profile.id);
@@ -50,10 +49,6 @@ function restoreTabLocations() {
   state.activeTab = state.tabs.at(-1)?.id || null;
   savedTabs = [];
 }
-function rememberRecent(id) {
-  recentProfiles = [id, ...recentProfiles.filter((previous) => previous !== id)].slice(0, 8);
-  safeStorage.set(RECENTS_KEY, recentProfiles);
-}
 async function refreshProfiles() {
   const version = ++state.profilesVersion;
   try {
@@ -65,94 +60,37 @@ async function refreshProfiles() {
     state.connected = new Set(state.profiles.filter((profile) => profile.connected).map((profile) => profile.id));
     state.serverInfo = Object.fromEntries(state.profiles.filter((profile) => profile.serverInfo).map((profile) => [profile.id, profile.serverInfo]));
     restoreTabLocations();
-    $('persistenceNote').textContent = data.credentialPersistence === 'windows-dpapi' ? 'Remembered passwords are protected by your Windows account.' : 'Password persistence is unavailable. Use session-only credentials.';
     fields.credentialMode.querySelector('[value="saved"]').disabled = data.credentialPersistence !== 'windows-dpapi';
-    if (state.selectedId && !selected()) { state.selectedId = null; state.navigation = null; state.navigationVersion++; }
-    if (state.navigation && (!selected() || state.navigation.profile.revision !== selected().revision || !state.connected.has(state.selectedId))) { state.navigation = null; state.navigationVersion++; }
-    renderProfiles(); renderExplorer(); renderHeader(); invalidateTabs();
+    if (state.selectedId && !selected()) state.selectedId = null;
+    syncProfiles();
+    invalidateTabs();
     bus.emit('profiles');
   } catch (error) { if (version === state.profilesVersion) fail(error, 'Could not load connections'); }
-}
-function renderProfiles() {
-  const root = $('connectionList');
-  root.replaceChildren();
-  const search = $('connectionSearch').value.toLowerCase().trim();
-  const profiles = state.profiles.filter((profile) => [profile.name, profile.group, profile.engine, profile.environment].join(' ').toLowerCase().includes(search)).sort((a, b) => Number(b.favorite) - Number(a.favorite) || (a.group || '').localeCompare(b.group || '') || a.name.localeCompare(b.name));
-  if (!profiles.length) {
-    root.append(el('p', 'hint', state.profiles.length ? 'No matching connections.' : 'No connections yet. Add a SQLite file or server connection to start exploring.'));
-    return;
-  }
-  const recent = recentProfiles.map(profileById).filter(Boolean).filter((profile) => !search || [profile.name, profile.group, profile.environment].join(' ').toLowerCase().includes(search));
-  if (recent.length) {
-    root.append(el('h2', 'group-title', 'Recent connections'));
-    for (const profile of recent.slice(0, 4)) root.append(button(profile.name, () => selectProfile(profile.id), 'connection-select recent-connection'));
-  }
-  let group;
-  for (const profile of profiles) {
-    const nextGroup = profile.favorite ? 'Favorites' : (profile.group || 'Ungrouped');
-    if (nextGroup !== group) { root.append(el('h2', 'group-title', nextGroup)); group = nextGroup; }
-    const row = el('div', `connection${profile.id === state.selectedId ? ' selected' : ''}`);
-    const select = button(profile.name, () => selectProfile(profile.id), 'connection-select connection-name');
-    select.setAttribute('aria-pressed', profile.id === state.selectedId ? 'true' : 'false');
-    const connected = state.connected.has(profile.id);
-    const meta = el('div', 'connection-meta', `${profile.engine} · ${environment(profile)} · ${connected ? 'connected' : 'disconnected'}`);
-    if (environment(profile) === 'production') meta.classList.add('environment-production');
-    row.append(select, meta);
-    const actions = el('div', 'connection-actions');
-    const pending = state.pendingConnections.has(profile.id);
-    actions.append(button(pending ? 'Working…' : connected ? 'Disconnect' : 'Connect', () => toggleConnection(profile), connected ? 'status-connected' : '', pending));
-    if (profile.id === state.selectedId) {
-      actions.append(button('Edit', () => openConnection(profile)), button('Duplicate', () => openConnection(profile, true)), button(profile.favorite ? 'Unfavorite' : 'Favorite', () => favorite(profile)), button('Delete', () => deleteConnection(profile), 'danger'));
-    }
-    row.append(actions); root.append(row);
-  }
-}
-function renderHeader() {
-  const profile = selected();
-  const root = $('targetHeader');
-  root.replaceChildren();
-  if (!profile) { root.textContent = 'No connection selected'; $('newQuery').disabled = true; return; }
-  const heading = el('strong', environment(profile) === 'production' ? 'environment-production' : '', `${profile.name} · ${environment(profile)}`);
-  root.append(heading, el('span', '', `${profile.engine} · ${profile.readOnly ? 'Read-only SQL' : 'Writable SQL'} · ${state.connected.has(profile.id) ? 'Connected' : 'Disconnected'}`));
-  $('newQuery').disabled = !state.connected.has(profile.id) || !state.navigation || state.navigation.busy || !!state.navigation.error;
-}
-function selectProfile(id) {
-  const changed = state.selectedId !== id;
-  state.selectedId = id;
-  rememberRecent(id);
-  renderProfiles(); renderHeader();
-  if (changed) { state.navigationVersion++; state.navigation = null; }
-  if (state.connected.has(id) && !state.navigation) loadNavigation();
-  else renderExplorer();
 }
 async function toggleConnection(profile) {
   if (state.pendingConnections.has(profile.id)) return;
   const disconnect = state.connected.has(profile.id);
   state.pendingConnections.add(profile.id);
-  if (!disconnect) selectProfile(profile.id);
-  renderProfiles();
+  bus.emit('tree'); bus.emit('target');
   notice(`${disconnect ? 'Disconnecting' : 'Connecting'} ${profile.name}…`);
   try {
     const result = await api(endpoint(profile, disconnect ? 'disconnect' : 'connect'), { revision: profile.revision });
     if (disconnect) {
       state.connected.delete(profile.id);
       delete state.serverInfo[profile.id];
-      if (state.selectedId === profile.id) { state.navigation = null; state.navigationVersion++; }
-      invalidateTabs(); renderProfiles(); renderExplorer(); renderHeader();
+      invalidateTabs();
+      syncProfiles();
       notice('Disconnected. Session-only credentials were cleared.');
     } else {
       state.connected.add(profile.id);
       if (result.serverInfo) state.serverInfo[profile.id] = result.serverInfo;
-      renderProfiles(); renderHeader();
-      if (state.selectedId === profile.id) {
-        state.navigation = null;
-        await loadNavigation(result.databases);
-      }
-      notice(`Connected to ${profile.name}.`);
+      showView('workspace');
+      await activateConnection(profile, result.databases);
+      notice(result.discoveryError || `Connected to ${profile.name}.`);
     }
     log(`${disconnect ? 'Disconnected from' : 'Connected to'} ${profile.name}.`);
   } catch (error) { fail(error, disconnect ? 'Disconnect failed' : 'Connection failed'); }
-  finally { state.pendingConnections.delete(profile.id); renderProfiles(); renderTabs(); renderTab(); bus.emit('profiles'); }
+  finally { state.pendingConnections.delete(profile.id); renderTabs(); renderTab(); bus.emit('profiles'); bus.emit('tree'); bus.emit('target'); }
 }
 async function favorite(profile) {
   try { await api('/api/connections', { ...profile, favorite: !profile.favorite }); await refreshProfiles(); }
@@ -237,85 +175,13 @@ async function submitConnection(test) {
     // Form errors intentionally stay out of logs: unsaved values can include secrets.
   } finally { controls.forEach((control) => { control.disabled = false; }); }
 }
-async function loadNavigation(initialDatabases) {
-  const profile = selected();
-  if (!profile || !state.connected.has(profile.id)) return;
-  const version = ++state.navigationVersion;
-  objectSearch = '';
-  const nav = { profile: structuredClone(profile), database: profile.settings?.database || '', schema: '', databases: [], schemas: [], tables: [], busy: true, error: '' };
-  state.navigation = nav; renderExplorer(); renderHeader();
-  try {
-    const data = initialDatabases === undefined ? await workspaceRequest(nav, { action: 'databases' }) : { databases: Array.isArray(initialDatabases) ? initialDatabases : initialDatabases.databases || [] };
-    if (version !== state.navigationVersion) return;
-    nav.databases = data.databases || [];
-    if (!nav.databases.includes(nav.database)) nav.database = nav.databases[0] || nav.database;
-    await loadObjects(nav, version);
-  } catch (error) {
-    if (version !== state.navigationVersion) return;
-    nav.error = error.message; nav.busy = false; renderExplorer();
-  }
-}
-async function loadObjects(nav = state.navigation, version = ++state.navigationVersion) {
-  if (!nav) return;
-  nav.busy = true; nav.error = ''; nav.tables = []; renderExplorer();
-  try {
-    if (capability(nav.profile, 'schemas')) {
-      const data = await workspaceRequest(nav, { action: 'schemas', database: nav.database });
-      if (version !== state.navigationVersion) return;
-      nav.schemas = data.schemas || [];
-      if (!nav.schemas.includes(nav.schema)) nav.schema = nav.schemas.includes('public') ? 'public' : nav.schemas[0] || '';
-    } else { nav.schemas = []; nav.schema = ''; }
-    const data = await workspaceRequest(nav, { action: 'tables', database: nav.database, schema: nav.schema });
-    if (version !== state.navigationVersion) return;
-    nav.tables = data.tables || []; nav.busy = false; renderExplorer(); renderHeader();
-  } catch (error) {
-    if (version !== state.navigationVersion) return;
-    nav.error = error.message; nav.busy = false; renderExplorer(); renderHeader();
-  }
-}
-function renderExplorer() {
-  const root = $('explorer'); root.replaceChildren();
-  const profile = selected();
-  if (!profile) { root.append(el('p', 'hint', 'Select a connection to explore its objects.')); return; }
-  if (!state.connected.has(profile.id)) { root.append(el('h2', 'group-title', profile.name), el('p', 'hint', 'Disconnected. Connect to discover databases and tables.')); return; }
-  const nav = state.navigation;
-  if (!nav) { root.append(el('p', 'hint', 'Loading explorer…')); return; }
-  const heading = el('div', 'section-head'); heading.append(el('h2', 'group-title', 'Database explorer'), button('Refresh', () => loadNavigation(), '', nav.busy)); root.append(heading);
-  if (!capability(profile, 'browse')) { root.append(el('p', 'hint', 'Object browsing is unsupported for this engine.')); return; }
-  if (profile.engine === 'sqlite') root.append(el('p', 'hint', profile.settings.file || 'SQLite file'));
-  else {
-    const databases = el('select'); databases.setAttribute('aria-label', 'Database');
-    for (const database of nav.databases) databases.append(option(database));
-    databases.value = nav.database; databases.disabled = nav.busy;
-    databases.addEventListener('change', () => { nav.database = databases.value; nav.schema = ''; loadObjects(); renderHeader(); });
-    root.append(label('Database', databases));
-  }
-  if (nav.schemas.length) {
-    const schemas = el('select'); schemas.setAttribute('aria-label', 'Schema');
-    for (const schema of nav.schemas) schemas.append(option(schema));
-    schemas.value = nav.schema; schemas.disabled = nav.busy;
-    schemas.addEventListener('change', () => { nav.schema = schemas.value; loadObjects(); });
-    root.append(label('Schema', schemas));
-  }
-  if (nav.busy) { root.append(el('p', 'hint', 'Discovering objects…')); return; }
-  if (nav.error) { root.append(el('p', 'error', nav.error), button('Retry discovery', () => loadNavigation())); return; }
-  if (!nav.tables.length) { root.append(el('p', 'hint', 'No accessible tables or views in this branch.')); return; }
-  const filter = el('input'); filter.type = 'search'; filter.placeholder = 'Find a table or view…'; filter.value = objectSearch; filter.setAttribute('aria-label', 'Find a table or view');
-  const list = el('div', 'object-list');
-  function renderObjects() {
-    list.replaceChildren();
-    const objects = nav.tables.filter((object) => object.name.toLowerCase().includes(objectSearch.toLowerCase()));
-    for (const object of objects) list.append(button(`${object.name} · ${object.type || 'table'}`, () => openTable(nav, object)));
-    if (!objects.length) list.append(el('p', 'hint', 'No matching objects.'));
-  }
-  filter.addEventListener('input', () => { objectSearch = filter.value; renderObjects(); });
-  renderObjects(); root.append(filter, list);
-}
 function makeTab(target, kind) {
   return { id: crypto.randomUUID(), kind, profile: structuredClone(target.profile), database: target.database || '', schema: target.schema || '', table: target.table || '', generation: 0, requestId: null, busy: false, data: null, error: '', sql: '', limit: 100, offset: 0, sortColumn: '', sortDirection: 'asc', filterColumn: '', filterValue: '', inspect: false, metadata: null };
 }
-function openTable(nav, object) {
-  const tab = makeTab({ ...nav, table: object.name, schema: object.schema || nav.schema }, 'table');
+function openTable(object) {   // object: a tree row { profileId, database, schema, name }
+  const profile = profileById(object.profileId);
+  if (!profile) return;
+  const tab = makeTab({ profile, database: object.database, schema: object.schema, table: object.name }, 'table');
   state.tabs.push(tab); state.activeTab = tab.id;
   showView('workspace'); renderTabs(); renderTab(); executeTab(tab);
   if (matchMedia('(max-width:680px)').matches) {
@@ -323,8 +189,10 @@ function openTable(nav, object) {
   }
 }
 function openQuery() {
-  if (!state.navigation || !selected()) return;
-  const tab = makeTab(state.navigation, 'query');
+  const target = state.target;
+  const profile = target && profileById(target.profileId);
+  if (!profile || !state.connected.has(profile.id)) { notice('Connect to a connection first, then open a SQL tab.', true); return; }
+  const tab = makeTab({ profile, database: target.database, schema: target.schema }, 'query');
   state.tabs.push(tab); state.activeTab = tab.id;
   showView('workspace'); renderTabs(); renderTab();
 }
@@ -349,6 +217,11 @@ function renderTabs() {
     const close = button('Close', () => closeTab(tab), 'close-tab'); close.setAttribute('aria-label', `Close ${title}`);
     item.append(select, close); root.append(item);
   }
+  const add = button('', openQuery, 'tab-add');
+  add.setAttribute('aria-label', 'New SQL tab');
+  add.title = 'New SQL tab';
+  add.textContent = '+';
+  root.append(add);
   bus.emit('tabs');
 }
 function closeTab(tab) {
@@ -529,8 +402,6 @@ function renderHistory(tab, root) {
 }
 $('closeConnection').addEventListener('click', () => $('connectionDialog').close());
 $('connectionDialog').addEventListener('close', () => { fields.password.value = ''; fields.url.value = ''; });
-$('connectionSearch').addEventListener('input', renderProfiles);
-$('newQuery').addEventListener('click', openQuery);
 $('clearLogs').addEventListener('click', () => { $('logConsole').replaceChildren(); state.errors = 0; $('errorCount').textContent = ''; });
 for (const name of ['engine', 'entryMode', 'credentialMode', 'passwordAction']) fields[name].addEventListener('change', syncConnectionForm);
 $('showPassword').addEventListener('click', () => { const show = fields.password.type === 'password'; fields.password.type = show ? 'text' : 'password'; $('showPassword').textContent = show ? 'Hide' : 'Show'; $('showPassword').setAttribute('aria-pressed', String(show)); });
@@ -540,10 +411,14 @@ $('addConnection').addEventListener('click', () => openConnection());
 $('addConnectionSmall').addEventListener('click', () => openConnection());
 actions.refreshProfiles = refreshProfiles;
 actions.openConnection = openConnection;
+actions.toggleConnection = toggleConnection;
+actions.favorite = favorite;
+actions.deleteConnection = deleteConnection;
+actions.openTable = openTable;
 actions.importCurrent = async () => {
   if (!confirm('Add the project’s current configuration as a saved connection? This explicitly reads its configuration. It will not connect automatically.')) return;
   try { await api('/api/connections/import-current', {}); await refreshProfiles(); notice('Current configuration added. Select it and choose Connect when ready.'); }
   catch (error) { fail(error, 'Configuration import failed'); }
 };
-initShell();
+initShell(); initNav(); initTree(); initHeader();
 renderTabs(); renderTab(); refreshProfiles();
