@@ -27,6 +27,13 @@ if (!engines.has('mysql')) seedEnv.DB_TOOLKIT_DEMO_MYSQL_PORT = '1';
 spawnSync(process.execPath, [fileURLToPath(new URL('./seed-demo.mjs', import.meta.url))], { env: seedEnv, stdio: 'ignore' });
 if (!fs.existsSync(sqliteFile)) throw new Error('Could not seed the sandbox SQLite database.');
 
+// startUiServer reads process.env directly for /api/status and /api/connections/import-current.
+// Strip anything loadDatabaseConfig would treat as real credentials so a developer's own
+// DATABASE_URL/PG*/MYSQL*/MSSQL* vars in the ambient shell can never reach this throwaway server.
+for (const key of Object.keys(process.env)) {
+  if (key === 'DATABASE_URL' || key === 'LOCAL_DATABASE_URL' || /^(DB_|PG|MYSQL_|MSSQL_)/.test(key)) delete process.env[key];
+}
+
 const connectionsDirectory = path.join(root, 'profiles');
 const store = await createConnectionStore({ directory: connectionsDirectory, cwd });
 const credentialMode = store.credentialPersistence === 'windows-dpapi' ? 'saved' : 'session';
