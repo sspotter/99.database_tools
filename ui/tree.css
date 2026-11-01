@@ -1,0 +1,51 @@
+/* tree */
+.tree{display:flex;flex-direction:column;gap:1px;padding-bottom:8px}
+.tree-empty{padding:8px 4px}
+.tree-row{display:flex;align-items:center;gap:6px;min-height:32px;padding:3px 6px 3px calc(6px + (var(--depth) - 1) * 16px);border-radius:7px;cursor:pointer;position:relative;user-select:none}
+.tree-row:hover{background:var(--row-hover)}
+.tree-row:focus-visible{outline-offset:-2px}
+.tree-row.selected,.tree-row.current{background:var(--row-selected)}
+.tree-row.kind-status{cursor:default;color:var(--muted);font-size:12px;font-style:italic}
+.tree-row.kind-status:hover{background:transparent}
+.tree-row.kind-status.error{color:var(--err);font-style:normal}
+.twisty{display:inline-grid;place-items:center;width:18px;height:18px;flex:none;color:var(--muted);transition:transform .12s}
+.twisty.leaf{visibility:hidden}
+.tree-row[aria-expanded="true"]>.twisty{transform:rotate(90deg)}
+.tree-icon{display:inline-flex;color:var(--muted);flex:none}
+.kind-schema .tree-icon,.kind-database .tree-icon,.kind-folder .tree-icon{color:var(--accent-text)}
+.kind-object .tree-icon{color:var(--muted)}
+.tree-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.kind-group .tree-label{font-weight:600}
+.kind-connection .tree-label{font-weight:600}
+.tree-count{color:var(--muted);font-size:11px;padding-right:4px}
+.tree-pill{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tree-pill.production{color:var(--err);border-color:var(--err)}
+.tree-dot{width:9px;height:9px;border-radius:50%;background:#51607a;flex:none}
+.tree-dot.on{background:var(--ok);box-shadow:0 0 0 3px #3ecf7e26}
+.tree-dot.busy{background:var(--warn)}
+.tree-action{padding:2px 8px;font-size:11px;border-radius:5px}
+.tree-row .tree-connect,.tree-row .tree-more{display:none}
+.tree-row:hover .tree-connect,.tree-row:focus-within .tree-connect,.tree-row.selected .tree-connect,.tree-row:hover .tree-more,.tree-row:focus-within .tree-more,.tree-row.selected .tree-more{display:inline-flex}
+.tree-more{width:24px;height:24px}
+@media(prefers-reduced-motion:no-preference){.tree-dot.busy{animation:pulse 1s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}}
+@media(hover:none){.tree-row .tree-connect,.tree-row .tree-more{display:inline-flex}}
+
+/* workspace header */
+.workspace-header{padding:14px 0 10px;border-bottom:1px solid var(--border);display:grid;gap:10px}
+.header-empty{margin:0;color:var(--muted)}
+.header-line{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.crumbs{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap;font-size:16px}
+.crumb{color:var(--text)}
+.crumb.current{font-weight:700}
+.crumb-sep{color:var(--muted)}
+.header-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.conn-status{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+.conn-status.on{color:var(--ok)}
+button.small{padding:4px 10px;font-size:12px}
+.header-selectors{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.header-selectors label{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.header-selectors select{width:auto;min-width:180px}
+
+/* tab strip add button */
+.tab-add{border:0;background:transparent;font-size:18px;line-height:1;padding:6px 12px;color:var(--muted);align-self:center}
+.tab-add:hover{color:var(--text)}
