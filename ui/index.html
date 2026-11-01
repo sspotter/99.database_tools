@@ -55,11 +55,18 @@
         <span class="logo">
           <svg class="icon" aria-hidden="true"><use href="#i-database"/></svg>
         </span>
-        Database Toolkit
+        <span class="brand-name">Database Toolkit</span>
       </div>
       <span class="local-label">
         Local workspace
       </span>
+      <div class="global-search" role="search">
+        <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="globalSearch" type="search" role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list" aria-label="Search connections, databases and tables" placeholder="Search connections, databases, tables…" autocomplete="off">
+        <kbd id="searchHint" aria-hidden="true">Ctrl K</kbd>
+        <div id="searchResults" class="search-results" role="listbox" aria-label="Search results" hidden>
+        </div>
+      </div>
       <button id="addConnection" class="primary add-button">
         <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
         <span class="btn-label">Add connection</span>

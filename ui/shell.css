@@ -80,3 +80,23 @@ main{min-width:0;min-height:0;overflow:auto;padding:0 20px 20px}
 #notice{position:fixed;z-index:55;right:16px;bottom:calc(var(--statusbar-h) + 12px);max-width:min(440px,calc(100vw - 32px));margin:0;border-radius:10px;font-size:13px;line-height:1.5;box-shadow:0 10px 28px #000a}
 #notice:not(:empty){padding:12px 16px;margin:0;background:var(--card);border:1px solid var(--border)}
 #notice.error:not(:empty){border-color:var(--err)}
+
+/* global search */
+.global-search{position:relative;flex:1;min-width:0;max-width:640px;margin:0 auto}
+.global-search .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.global-search input{padding:9px 72px 9px 38px;border-radius:9px;background:var(--bg)}
+.global-search kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:600 11px/1 inherit;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:3px 6px;background:var(--panel)}
+.global-search input:focus+kbd{display:none}
+.add-button{margin-left:0}
+.search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;max-height:min(70vh,520px);overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 14px 36px #000a;padding:6px}
+.search-title{padding:6px 10px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.search-option{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer}
+.search-option[aria-selected="true"]{background:var(--row-selected)}
+.search-option mark{background:transparent;color:var(--accent-text);font-weight:700}
+.search-option .icon{color:var(--muted)}
+.search-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-detail{margin-left:auto;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50%}
+.search-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);flex:none}
+.search-note{padding:8px 10px;color:var(--muted);font-size:12px}
+@media(max-width:900px){.brand-name{display:none}}
+@media(max-width:680px){.global-search kbd{display:none}.global-search input{padding-right:12px}}

@@ -4,6 +4,7 @@ import { initNav, syncProfiles, activateConnection } from './nav.js';
 import { initTree } from './tree.js';
 import { initHeader } from './header.js';
 import { initTabs, renderTabs, renderTab, invalidateTabs, restoreTabLocations } from './tabs.js';
+import { initSearch } from './search.js';
 
 const form = $('connectionForm');
 const fields = form.elements;
@@ -153,5 +154,5 @@ actions.importCurrent = async () => {
   try { await api('/api/connections/import-current', {}); await refreshProfiles(); notice('Current configuration added. Select it and choose Connect when ready.'); }
   catch (error) { fail(error, 'Configuration import failed'); }
 };
-initShell(); initNav(); initTabs(); initTree(); initHeader();
+initShell(); initNav(); initTabs(); initTree(); initHeader(); initSearch();
 renderTabs(); renderTab(); refreshProfiles();
