@@ -281,6 +281,7 @@ test('SQLite catalog caps at 10000 objects', async (t) => {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const p = { engine: 'sqlite', readOnly: true, settings: { file } };
   await assert.rejects(runDatabaseTask(p, { action: 'catalog' }), /exceeds 10000 objects/);
+  await assert.rejects(runDatabaseTask(p, { action: 'tables' }), /exceeds 10000 objects/);
 });
 
 test('SQL Server qualified sources support write aliases and scoped CTE references', () => {
