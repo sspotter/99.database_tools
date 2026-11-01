@@ -270,6 +270,19 @@ test('SQLite serverInfo and catalog', async (t) => {
   });
 });
 
+test('SQLite catalog caps at 10000 objects', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-db-cap-'));
+  const file = path.join(dir, 'fixture.db');
+  const db = new DatabaseSync(file);
+  db.exec('BEGIN');
+  for (let i = 0; i < 10001; i += 1) db.exec(`CREATE TABLE t${i} (id INTEGER)`);
+  db.exec('COMMIT');
+  db.close();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const p = { engine: 'sqlite', readOnly: true, settings: { file } };
+  await assert.rejects(runDatabaseTask(p, { action: 'catalog' }), /exceeds 10000 objects/);
+});
+
 test('SQL Server qualified sources support write aliases and scoped CTE references', () => {
   for (const sql of [
     'SELECT * FROM analytics.users AS users',
