@@ -258,3 +258,14 @@ export function recordHistory(tab) {
   saveHistory();
 }
 export function clearHistory() { state.history = []; saveHistory(); }
+
+// ---- recently used connections (shown by global search in phase 6) -----------------------------------------
+const RECENTS_KEY = 'database-toolkit-recents-v1';
+let recents = safeStorage.get(RECENTS_KEY, []);
+if (!Array.isArray(recents)) recents = [];
+recents = recents.filter((id) => typeof id === 'string').slice(0, 8);
+export const recentIds = () => recents.filter((id) => profileById(id));
+export function rememberRecent(id) {
+  recents = [id, ...recents.filter((previous) => previous !== id)].slice(0, 8);
+  safeStorage.set(RECENTS_KEY, recents);
+}
