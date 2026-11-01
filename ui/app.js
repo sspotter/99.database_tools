@@ -1,54 +1,13 @@
-import { $, el, button, option, label, api, state, bus, actions, notice, log, fail, safeStorage, profileById, selected, activeTab, endpoint, environment, capability, targetText, recordRun, saveHistory, recordHistory, workspaceRequest } from './core.js';
+import { $, option, api, state, bus, actions, notice, log, fail, selected, endpoint } from './core.js';
 import { initShell, showView } from './shell.js';
-import { initNav, syncProfiles, activateConnection, syncTargetFromTab } from './nav.js';
+import { initNav, syncProfiles, activateConnection } from './nav.js';
 import { initTree } from './tree.js';
 import { initHeader } from './header.js';
-import { nodeKey } from './models.js';
+import { initTabs, renderTabs, renderTab, invalidateTabs, restoreTabLocations } from './tabs.js';
 
 const form = $('connectionForm');
 const fields = form.elements;
-const TABS_KEY = 'database-toolkit-tabs-v1';
-let savedTabs = [];
-let tabsRestored = false;
-const restoredTabs = safeStorage.get(TABS_KEY, []);
-if (Array.isArray(restoredTabs)) savedTabs = restoredTabs.slice(0, 30);
 
-function tabBlockReason(tab) {
-  const current = profileById(tab.profile.id);
-  if (!current) return 'This connection was deleted. Open a tab from another saved connection.';
-  if (current.revision !== tab.profile.revision) return 'This connection changed. Reconnect and reopen this target to use the new revision.';
-  if (!state.connected.has(tab.profile.id)) return 'Connection disconnected. Connect this profile to run again.';
-  return '';
-}
-function invalidateTabs() {
-  for (const tab of state.tabs) {
-    if (tabBlockReason(tab)) {
-      tab.generation++;
-      if (tab.requestId) api('/api/workspace/cancel', { requestId: tab.requestId }).catch(() => {});
-      tab.requestId = null;
-      tab.busy = false;
-    }
-  }
-  renderTabs();
-  renderTab();
-}
-function rememberTabLocations() {
-  if (!tabsRestored) return;
-  const locations = state.tabs.map((tab) => ({ profileId: tab.profile.id, revision: tab.profile.revision, database: tab.database, schema: tab.schema, table: tab.table, kind: tab.kind }));
-  safeStorage.set(TABS_KEY, locations);
-}
-function restoreTabLocations() {
-  if (tabsRestored) return;
-  tabsRestored = true;
-  for (const location of savedTabs) {
-    if (!location || typeof location.profileId !== 'string' || !Number.isInteger(location.revision) || !['query', 'table'].includes(location.kind)) continue;
-    if (['database', 'schema', 'table'].some((key) => typeof location[key] !== 'string')) continue;
-    const profile = profileById(location.profileId) || { id: location.profileId, name: 'Deleted connection', environment: 'unavailable', readOnly: true, settings: {} };
-    state.tabs.push(makeTab({ profile: { ...profile, revision: location.revision }, database: location.database, schema: location.schema, table: location.table }, location.kind));
-  }
-  state.activeTab = state.tabs.at(-1)?.id || null;
-  savedTabs = [];
-}
 async function refreshProfiles() {
   const version = ++state.profilesVersion;
   try {
@@ -175,231 +134,6 @@ async function submitConnection(test) {
     // Form errors intentionally stay out of logs: unsaved values can include secrets.
   } finally { controls.forEach((control) => { control.disabled = false; }); }
 }
-function makeTab(target, kind) {
-  return { id: crypto.randomUUID(), kind, profile: structuredClone(target.profile), database: target.database || '', schema: target.schema || '', table: target.table || '', generation: 0, requestId: null, busy: false, data: null, error: '', sql: '', limit: 100, offset: 0, sortColumn: '', sortDirection: 'asc', filterColumn: '', filterValue: '', inspect: false, metadata: null };
-}
-function openTable(object) {   // object: a tree row { profileId, database, schema, name }
-  const profile = profileById(object.profileId);
-  if (!profile) return;
-  const tab = makeTab({ profile, database: object.database, schema: object.schema, table: object.name }, 'table');
-  state.tabs.push(tab); state.activeTab = tab.id;
-  showView('workspace'); renderTabs(); renderTab(); executeTab(tab);
-  if (matchMedia('(max-width:680px)').matches) {
-    $('sidebar').classList.remove('open'); $('sidebarToggle').setAttribute('aria-expanded', 'false'); $('workspace').focus();
-  }
-}
-function openQuery() {
-  const target = state.target;
-  const profile = target && profileById(target.profileId);
-  if (!profile || !state.connected.has(profile.id)) { notice('Connect to a connection first, then open a SQL tab.', true); return; }
-  const tab = makeTab({ profile, database: target.database, schema: target.schema }, 'query');
-  state.tabs.push(tab); state.activeTab = tab.id;
-  showView('workspace'); renderTabs(); renderTab();
-}
-function renderTabs() {
-  rememberTabLocations();
-  const root = $('workspaceTabs'); root.replaceChildren();
-  for (const tab of state.tabs) {
-    const item = el('div', `tab-item${tab.id === state.activeTab ? ' active' : ''}`);
-    const title = `${tab.profile.name} / ${tab.table || 'SQL'} · ${environment(tab.profile)}${tabBlockReason(tab) ? ' · unavailable' : ''}`;
-    const select = button(title, () => { state.activeTab = tab.id; renderTabs(); renderTab(); $('tab-' + tab.id).focus(); });
-    select.id = 'tab-' + tab.id;
-    select.tabIndex = tab.id === state.activeTab ? 0 : -1;
-    select.setAttribute('role', 'tab'); select.setAttribute('aria-selected', String(tab.id === state.activeTab)); select.setAttribute('aria-controls', 'tabContent');
-    select.addEventListener('keydown', (event) => {
-      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-      event.preventDefault();
-      const index = state.tabs.indexOf(tab);
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? state.tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + state.tabs.length) % state.tabs.length;
-      state.activeTab = state.tabs[next].id; renderTabs(); renderTab();
-      root.querySelectorAll('[role="tab"]')[next].focus();
-    });
-    const close = button('Close', () => closeTab(tab), 'close-tab'); close.setAttribute('aria-label', `Close ${title}`);
-    item.append(select, close); root.append(item);
-  }
-  const add = button('', openQuery, 'tab-add');
-  add.setAttribute('aria-label', 'New SQL tab');
-  add.title = 'New SQL tab';
-  add.textContent = '+';
-  root.append(add);
-  bus.emit('tabs');
-}
-function closeTab(tab) {
-  tab.generation++;
-  if (tab.requestId) api('/api/workspace/cancel', { requestId: tab.requestId }).catch(() => {});
-  state.tabs = state.tabs.filter((item) => item !== tab);
-  if (state.activeTab === tab.id) state.activeTab = state.tabs.at(-1)?.id || null;
-  renderTabs(); renderTab();
-}
-function renderTab() {
-  const root = $('tabContent'); root.replaceChildren(); root.setAttribute('role', 'tabpanel');
-  const tab = activeTab();
-  if (tab) root.setAttribute('aria-labelledby', 'tab-' + tab.id);
-  else root.removeAttribute('aria-labelledby');
-  if (!tab) {
-    const empty = el('div', 'empty-state');
-    empty.append(el('h2', '', 'A workspace for your databases.'), el('p', '', 'Keep your connections together. Explore a table, inspect its structure, or run SQL in an independent tab.'), button('Add a connection', () => openConnection(), 'primary'), el('p', 'hint', 'Start with an existing SQLite file or connect to PostgreSQL, MySQL or SQL Server. Nothing connects automatically.'));
-    root.append(empty); return;
-  }
-  const strip = el('div', 'target-strip');
-  strip.append(el('strong', '', targetText(tab)), el('span', `badge ${environment(tab.profile) === 'production' ? 'environment-production' : ''}`, environment(tab.profile)), el('span', `badge ${tab.profile.readOnly ? '' : 'writable'}`, tab.profile.readOnly ? 'Read-only SQL' : 'Writable SQL'), el('span', 'badge', `revision ${tab.profile.revision}`));
-  root.append(strip);
-  const reason = tabBlockReason(tab);
-  if (reason) root.append(el('p', 'error', reason));
-  if (tab.kind === 'query') renderQuery(tab, root, !!reason);
-  else renderTableControls(tab, root, !!reason);
-  if (tab.error) root.append(el('p', 'error', tab.error));
-  if (tab.busy) root.append(el('p', 'result-meta', 'Running… Cancellation terminates the database request.'));
-  if (tab.inspect && tab.metadata) renderMetadata(tab.metadata, root);
-  else if (tab.data) renderResult(tab, root);
-}
-function renderQuery(tab, root, blocked) {
-  if (tab.profile.engine === 'mssql') {
-    root.append(el('p', 'hint', 'SQL Server uses your login’s default schema for unqualified names. Use [schema].[table] to target the schema shown on this tab.'));
-  }
-  const supported = capability(tab.profile, 'query') && (!tab.profile.readOnly || capability(tab.profile, 'readOnlyQuery'));
-  if (!supported) root.append(el('p', 'hint', 'Arbitrary SQL is unavailable for this engine or its read-only mode. Table browsing remains available.'));
-  const editor = el('textarea', 'sql-editor'); editor.value = tab.sql; editor.placeholder = 'Write one SQL statement…'; editor.spellcheck = false; editor.setAttribute('aria-label', 'SQL statement');
-  editor.addEventListener('input', () => { tab.sql = editor.value; });
-  editor.addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); if (!tab.busy && !blocked && supported && tab.sql.trim()) executeTab(tab); } });
-  const tools = el('div', 'tab-tools');
-  tools.append(button('Run SQL', () => executeTab(tab), 'primary', blocked || !supported || tab.busy), button('Cancel', () => cancelTab(tab), '', !tab.busy), el('span', 'hint', 'Ctrl / Cmd + Enter · One statement · No shared transaction'));
-  root.append(editor, tools);
-  renderHistory(tab, root);
-}
-function renderTableControls(tab, root, blocked) {
-  const tools = el('div', 'tab-tools');
-  const pageSize = el('select', 'page-size'); pageSize.setAttribute('aria-label', 'Rows per page');
-  for (const count of [50, 100, 250, 500, 1000]) pageSize.append(option(String(count)));
-  pageSize.value = String(tab.limit); pageSize.disabled = tab.busy;
-  pageSize.addEventListener('change', () => { tab.limit = Number(pageSize.value); tab.offset = 0; executeTab(tab); });
-  const filterColumn = el('select'); filterColumn.setAttribute('aria-label', 'Filter column'); filterColumn.append(option('', 'No filter'));
-  for (const column of tab.data?.columns || []) filterColumn.append(option(column));
-  filterColumn.value = tab.filterColumn;
-  const filterValue = el('input'); filterValue.value = tab.filterValue; filterValue.placeholder = 'Exact value'; filterValue.setAttribute('aria-label', 'Filter value');
-  filterColumn.addEventListener('change', () => { tab.filterColumn = filterColumn.value; });
-  filterValue.addEventListener('input', () => { tab.filterValue = filterValue.value; });
-  filterValue.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !blocked && !tab.busy) { tab.offset = 0; executeTab(tab); } });
-  tools.append(label('Rows per page', pageSize), label('Filter column', filterColumn), label('Equals', filterValue), button('Apply filter', () => { tab.offset = 0; executeTab(tab); }, '', blocked || tab.busy), button('Refresh rows', () => { tab.inspect = false; executeTab(tab); }, '', blocked || tab.busy), button(tab.inspect ? 'Show rows' : 'Structure', () => { tab.inspect = !tab.inspect; if (tab.inspect && !tab.metadata) executeTab(tab, true); else renderTab(); }, '', blocked || tab.busy || !capability(tab.profile, 'inspect')));
-  root.append(tools);
-  const paging = el('div', 'tab-tools');
-  paging.append(button('Previous page', () => { tab.offset = Math.max(0, tab.offset - tab.limit); executeTab(tab); }, '', blocked || tab.busy || tab.offset === 0), el('span', 'hint', `Page ${Math.floor(tab.offset / tab.limit) + 1}`), button('Next page', () => { tab.offset += tab.limit; executeTab(tab); }, '', blocked || tab.busy || !tab.data?.hasMore));
-  root.append(paging, el('p', 'hint', 'Click a column heading to sort. Pages can shift as data changes; use a unique column for stable ordering.'));
-}
-async function executeTab(tab, inspect = false) {
-  if (tab.busy || tabBlockReason(tab)) return;
-  if (tab.kind === 'query' && !tab.sql.trim()) { tab.error = 'Enter one SQL statement first.'; renderTab(); return; }
-  const generation = ++tab.generation;
-  const started = performance.now();
-  const requestId = crypto.randomUUID();
-  tab.requestId = requestId; tab.busy = true; tab.error = '';
-  if (!inspect) { tab.inspect = false; tab.data = null; }
-  let task = { action: inspect ? 'inspect' : tab.kind === 'query' ? 'query' : 'rows', database: tab.database, schema: tab.schema, table: tab.table, limit: tab.limit, offset: tab.offset };
-  if (tab.kind === 'query') task.sql = tab.sql;
-  else if (!inspect) {
-    if (tab.sortColumn) { task.sortColumn = tab.sortColumn; task.sortDirection = tab.sortDirection; }
-    if (tab.filterColumn) { task.filterColumn = tab.filterColumn; task.filterValue = tab.filterValue; }
-  }
-  if (state.activeTab === tab.id) renderTab();
-  if (tab.kind === 'query' && !inspect) recordHistory(tab);
-  try {
-    const data = await workspaceRequest(tab, task, requestId);
-    if (generation !== tab.generation || !state.tabs.includes(tab) || tabBlockReason(tab)) return;
-    if (inspect) tab.metadata = data;
-    else tab.data = data;
-    recordRun(true, data.durationMs ?? performance.now() - started, inspect ? 'Inspection completed' : tab.kind === 'query' ? 'Query completed' : 'Rows loaded');
-    log(`${inspect ? 'Inspected' : tab.kind === 'query' ? 'Ran query against' : 'Loaded rows from'} ${targetText(tab)}.`);
-  } catch (error) {
-    if (generation !== tab.generation || !state.tabs.includes(tab)) return;
-    tab.error = error.message;
-    recordRun(false, 0, 'Request');
-    log(`Database request failed for ${targetText(tab)}: ${error.message}`, true);
-  } finally {
-    if (generation === tab.generation) { tab.requestId = null; tab.busy = false; if (state.activeTab === tab.id) renderTab(); }
-  }
-}
-async function cancelTab(tab) {
-  if (!tab.requestId) return;
-  const requestId = tab.requestId;
-  try {
-    const response = await api('/api/workspace/cancel', { requestId });
-    if (tab.requestId !== requestId) return;
-    if (!response.cancelled) { notice('This request has already finished.'); return; }
-    tab.generation++; tab.requestId = null; tab.busy = false; tab.error = 'Request cancelled. It was not retried.';
-    if (state.activeTab === tab.id) renderTab();
-    log(`Cancelled database request for ${targetText(tab)}.`);
-  } catch (error) { fail(error, 'Could not cancel request'); }
-}
-function cellText(value) {
-  if (value === null || value === undefined) return 'NULL';
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
-}
-function renderResult(tab, root) {
-  const data = tab.data;
-  const tools = el('div', 'tab-tools');
-  tools.append(el('span', 'result-meta', `${data.rows?.length || 0} loaded rows · ${data.columns?.length || 0} columns${data.durationMs !== undefined ? ' · ' + data.durationMs + ' ms' : ''}${data.hasMore ? ' · more rows available' : ''}${data.truncatedValues ? ' · ' + data.truncatedValues + ' values truncated' : ''}`), button('Export loaded JSON', () => exportResult(tab, 'json')), button('Export loaded CSV', () => exportResult(tab, 'csv')));
-  root.append(tools);
-  if (!data.columns?.length) { root.append(el('p', 'hint', `Statement completed.${data.rowCount !== undefined ? ' Affected rows: ' + data.rowCount + '.' : ''}`)); return; }
-  if (!data.rows?.length) root.append(el('p', 'hint', 'No rows returned for this page or filter.'));
-  const wrap = el('div', 'data-table-wrap'); wrap.tabIndex = 0; wrap.setAttribute('aria-label', 'Result rows; scroll horizontally for more columns');
-  const table = el('table', 'data-table'); const head = el('thead'); const headRow = el('tr');
-  for (const column of data.columns) {
-    const cell = el('th'); cell.scope = 'col';
-    if (tab.kind === 'table') {
-      const sort = button(`${column}${tab.sortColumn === column ? ' (' + tab.sortDirection + ')' : ''}`, () => { tab.sortDirection = tab.sortColumn === column && tab.sortDirection === 'asc' ? 'desc' : 'asc'; tab.sortColumn = column; tab.offset = 0; executeTab(tab); }, '', tab.busy || !!tabBlockReason(tab));
-      sort.title = `Sort by ${column}`; cell.append(sort);
-      if (tab.sortColumn === column) cell.setAttribute('aria-sort', tab.sortDirection === 'asc' ? 'ascending' : 'descending');
-    } else cell.textContent = column;
-    headRow.append(cell);
-  }
-  head.append(headRow); table.append(head);
-  const body = el('tbody');
-  for (const row of data.rows || []) {
-    const tr = el('tr');
-    for (const column of data.columns) {
-      const value = row[column]; const text = cellText(value);
-      const cell = el('td', value === null || value === undefined ? 'null-cell' : '', text.length > 1000 ? text.slice(0, 1000) + '…' : text);
-      if (text.length > 1000) cell.title = 'Display truncated to 1,000 characters. Export loaded JSON for the full returned value.';
-      else cell.title = text;
-      tr.append(cell);
-    }
-    body.append(tr);
-  }
-  table.append(body); wrap.append(table); root.append(wrap);
-}
-function renderMetadata(metadata, root) {
-  for (const [title, value] of [['Columns', metadata.columns], ['Indexes', metadata.indexes], ['Foreign keys', metadata.foreignKeys]]) {
-    root.append(el('h3', '', title));
-    root.append(el('pre', 'inspector', value?.length ? JSON.stringify(value, null, 2) : 'None reported.'));
-  }
-  if (metadata.definition) root.append(el('h3', '', 'Definition'), el('pre', 'inspector', metadata.definition));
-}
-function exportResult(tab, format) {
-  const data = tab.data;
-  const csvCell = (value) => {
-    let text = value === null || value === undefined ? '' : cellText(value);
-    // Spreadsheet programs treat these prefixes as formulas, even in quoted CSV.
-    if (typeof value === 'string' && /^[=+@\-\t\r]/.test(text)) text = "'" + text;
-    return '"' + text.replaceAll('"', '""') + '"';
-  };
-  const content = format === 'json' ? JSON.stringify(data.rows || [], null, 2) : [data.columns.map(csvCell).join(','), ...(data.rows || []).map((row) => data.columns.map((column) => csvCell(row[column])).join(','))].join('\r\n');
-  const url = URL.createObjectURL(new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8' }));
-  const anchor = el('a'); anchor.href = url; anchor.download = `loaded-${(tab.table || 'query').replace(/[^a-z0-9_-]/gi, '_')}.${format}`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function renderHistory(tab, root) {
-  const section = el('details', 'history');
-  section.append(el('summary', '', 'Query history'));
-  const persistent = el('input'); persistent.type = 'checkbox'; persistent.checked = state.persistHistory;
-  persistent.addEventListener('change', () => { state.persistHistory = persistent.checked; saveHistory(); });
-  const check = label('Remember SQL history in this browser', persistent); check.className = 'check'; section.append(check, el('p', 'hint', 'Session-only by default. SQL may contain sensitive values. Password statements and credential URLs are excluded. Up to 100 entries are retained.'));
-  section.append(button('Clear all history', () => { state.history = []; saveHistory(); renderTab(); }));
-  const entries = state.history.filter((item) => item.profileId === tab.profile.id && item.database === tab.database);
-  if (!entries.length) section.append(el('p', 'hint', 'No history for this connection and database.'));
-  for (const item of entries.slice(0, 20)) {
-    const row = el('div', 'history-row'); row.append(button(item.sql, () => { tab.sql = item.sql; renderTab(); }), el('span', 'hint', new Date(item.at).toLocaleString())); section.append(row);
-  }
-  root.append(section);
-}
 $('closeConnection').addEventListener('click', () => $('connectionDialog').close());
 $('connectionDialog').addEventListener('close', () => { fields.password.value = ''; fields.url.value = ''; });
 $('clearLogs').addEventListener('click', () => { $('logConsole').replaceChildren(); state.errors = 0; $('errorCount').textContent = ''; });
@@ -414,11 +148,10 @@ actions.openConnection = openConnection;
 actions.toggleConnection = toggleConnection;
 actions.favorite = favorite;
 actions.deleteConnection = deleteConnection;
-actions.openTable = openTable;
 actions.importCurrent = async () => {
   if (!confirm('Add the project’s current configuration as a saved connection? This explicitly reads its configuration. It will not connect automatically.')) return;
   try { await api('/api/connections/import-current', {}); await refreshProfiles(); notice('Current configuration added. Select it and choose Connect when ready.'); }
   catch (error) { fail(error, 'Configuration import failed'); }
 };
-initShell(); initNav(); initTree(); initHeader();
+initShell(); initNav(); initTabs(); initTree(); initHeader();
 renderTabs(); renderTab(); refreshProfiles();

@@ -48,7 +48,7 @@ function activate(row) {
 
 function openMenu(row, anchor) {
   const profile = row.profileId ? profileById(row.profileId) : null;
-  if (!profile || !['connection', 'database'].includes(row.kind)) return;
+  if (!profile || !['connection', 'database', 'object'].includes(row.kind)) return;
   const menu = el('div', 'menu');
   menu.setAttribute('role', 'menu');
   const run = (fn) => () => { handle.close(true); fn(); };
@@ -61,7 +61,15 @@ function openMenu(row, anchor) {
       menuItem(profile.favorite ? 'Remove from favorites' : 'Add to favorites', 'star', run(() => actions.favorite(profile))),
       menuItem('Delete', 'close', run(() => actions.deleteConnection(profile)), { danger: true }),
     );
-  } else menu.append(menuItem('Refresh objects', 'refresh', run(() => loadCatalog(profile, row.database, { force: true }))));
+  } else if (row.kind === 'database') menu.append(menuItem('Refresh objects', 'refresh', run(() => loadCatalog(profile, row.database, { force: true }))));
+  else if (row.kind === 'object') {
+    menu.append(
+      menuItem('Open', 'table', run(() => actions.openTable(row))),
+      menuItem('Open in new tab', 'plus', run(() => actions.openTable(row, { fresh: true }))),
+      menuItem('Open structure', 'list', run(() => actions.openTable(row, { view: 'structure' }))),
+      menuItem('New SQL tab here', 'sql', run(() => actions.openQuery({ profileId: row.profileId, database: row.database, schema: row.schema }))),
+    );
+  }
   menuKeys(menu);
   const handle = popover(anchor, menu);
   menu.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
@@ -130,7 +138,7 @@ function rowElement(row) {
   }
   node.addEventListener('click', () => activate(row));
   node.addEventListener('contextmenu', (event) => {
-    if (!['connection', 'database'].includes(row.kind)) return;
+    if (!['connection', 'database', 'object'].includes(row.kind)) return;
     event.preventDefault();
     openMenu(row, { getBoundingClientRect: () => ({ left: event.clientX, right: event.clientX, top: event.clientY, bottom: event.clientY }) });
   });
