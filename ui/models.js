@@ -87,3 +87,64 @@ export function buildTree({ profiles, connected, databasesByProfile, catalogs, e
   for (const profile of sorted.filter((candidate) => !groupOf(candidate))) addConnection(profile, 1);
   return rows;
 }
+
+// ---- global search --------------------------------------------------------------------------------------------
+export function buildSearchIndex({ profiles, connected, databasesByProfile, catalogs }) {
+  const entries = [];
+  for (const profile of profiles) {
+    const base = { profileId: profile.id, engine: profile.engine };
+    entries.push({ kind: 'connection', label: profile.name, detail: [profile.engine, profile.group, profile.environment].filter(Boolean).join(' · '), ...base });
+    if (!connected.has(profile.id)) continue;
+    const levels = levelsFor(profile.engine);
+    for (const database of databasesByProfile[profile.id] ?? []) {
+      if (levels.database) entries.push({ kind: 'database', label: database, detail: profile.name, ...base, database });
+      const catalog = catalogs[catalogKey(profile.id, database)];
+      if (catalog?.status !== 'ready') continue;
+      for (const schema of catalog.schemas) {
+        if (levels.schema) entries.push({ kind: 'schema', label: schema.name, detail: `${profile.name} · ${database}`, ...base, database, schema: schema.name });
+        for (const object of schema.objects) {
+          entries.push({
+            kind: object.type, label: object.name,
+            detail: [profile.name, levels.database ? database : '', levels.schema ? schema.name : ''].filter(Boolean).join(' · '),
+            ...base, database, schema: schema.name, name: object.name, objectType: object.type,
+          });
+        }
+      }
+    }
+  }
+  return entries;
+}
+
+const KIND_ORDER = { connection: 0, database: 1, schema: 2, table: 3, view: 4 };
+function wordStart(text, index) {
+  if (index === 0) return true;
+  const previous = text[index - 1];
+  return /[^a-z0-9]/i.test(previous) || (/[a-z]/.test(previous) && /[A-Z]/.test(text[index]));
+}
+function scoreLabel(label, query) {
+  const text = label.toLowerCase();
+  if (text === query) return 100;
+  if (text.startsWith(query)) return 80;
+  for (let at = text.indexOf(query); at >= 0; at = text.indexOf(query, at + 1)) if (wordStart(label, at)) return 60;
+  const anywhere = text.indexOf(query);
+  if (anywhere >= 0) return 40 - Math.min(anywhere, 20) / 2;
+  if (query.length >= 3 && text[0] === query[0]) {        // in-order letters, anchored to the first one
+    let from = 0;
+    for (const char of query) { from = text.indexOf(char, from); if (from < 0) return 0; from++; }
+    return 20;
+  }
+  return 0;
+}
+export function searchIndex(index, query, limit = 30) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const scored = [];
+  for (const entry of index) {
+    let score = scoreLabel(entry.label, needle);
+    if (!score && entry.kind === 'connection' && entry.detail.toLowerCase().includes(needle)) score = 10;
+    if (score) scored.push({ entry, score });
+  }
+  scored.sort((a, b) => b.score - a.score || KIND_ORDER[a.entry.kind] - KIND_ORDER[b.entry.kind]
+    || a.entry.label.length - b.entry.label.length || a.entry.label.localeCompare(b.entry.label));
+  return scored.slice(0, limit).map((item) => item.entry);
+}

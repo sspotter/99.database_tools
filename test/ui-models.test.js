@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTree, nodeKey, catalogKey, levelsFor, folderSchema } from '../ui/models.js';
+import { buildTree, nodeKey, catalogKey, levelsFor, folderSchema, buildSearchIndex, searchIndex } from '../ui/models.js';
 
 const pg = { id: 'p1', name: 'Demo · PostgreSQL', engine: 'postgres', group: 'Demo / Test' };
 const my = { id: 'm1', name: 'Demo · MySQL', engine: 'mysql', group: 'Demo / Test' };
@@ -102,4 +102,51 @@ test('selected and current flags, environment and connection state travel with t
 test('a disconnected connection has no children and is not expandable', () => {
   const rows = buildTree({ ...base, profiles: [lite], expanded: new Set([nodeKey('c', 's1')]) });
   assert.deepEqual([rows.length, rows[0].expandable, rows[0].expanded, rows[0].connected], [1, false, false, false]);
+});
+
+const reporting = { id: 'r1', name: 'Reporting MySQL', engine: 'mysql', environment: 'production' };
+const searchCatalog = {
+  status: 'ready', defaultSchema: 'public', error: '',
+  schemas: [
+    { name: 'public', objects: [obj('public', 'customers'), obj('public', 'orders'), obj('public', 'order_items'), obj('public', 'order_summary', 'view')] },
+    { name: 'sales', objects: [obj('sales', 'leads')] },
+  ],
+};
+const index = buildSearchIndex({
+  profiles: [{ ...pg, environment: 'development' }, { ...lite, environment: 'development' }, reporting],
+  connected: new Set(['p1', 's1']),
+  databasesByProfile: { p1: ['toolkit_demo', 'analytics'], s1: ['/tmp/demo.sqlite'] },
+  catalogs: {
+    [catalogKey('p1', 'toolkit_demo')]: searchCatalog,
+    [catalogKey('s1', '/tmp/demo.sqlite')]: { status: 'ready', defaultSchema: 'main', error: '', schemas: [{ name: 'main', objects: [obj('main', 'notes')] }] },
+  },
+});
+const labels = (query, limit) => searchIndex(index, query, limit).map((entry) => entry.label);
+
+test('buildSearchIndex lists connections always, and databases/schemas/objects only for connected, loaded catalogs', () => {
+  const count = (kind) => index.filter((entry) => entry.kind === kind).length;
+  assert.deepEqual([count('connection'), count('database'), count('schema'), count('table'), count('view')], [3, 2, 2, 5, 1]);
+  assert.equal(index.some((entry) => entry.profileId === 'r1' && entry.kind !== 'connection'), false, 'disconnected connections expose nothing else');
+  assert.deepEqual(index.find((entry) => entry.label === 'orders'), {
+    kind: 'table', label: 'orders', detail: 'Demo · PostgreSQL · toolkit_demo · public', profileId: 'p1', engine: 'postgres',
+    database: 'toolkit_demo', schema: 'public', name: 'orders', objectType: 'table',
+  });
+  assert.equal(index.find((entry) => entry.label === 'notes').detail, 'Demo · SQLite', 'sqlite has no database or schema level');
+  assert.equal(index.some((entry) => entry.kind === 'database' && entry.profileId === 's1'), false);
+});
+
+test('searchIndex ranks exact > prefix > word start > substring > fuzzy, then kind and length', () => {
+  assert.deepEqual(labels('ord'), ['orders', 'order_items', 'order_summary']);
+  assert.equal(labels('orders')[0], 'orders');
+  assert.deepEqual(labels('ITEMS'), ['order_items']);
+  assert.deepEqual(labels('umm'), ['order_summary']);
+  assert.deepEqual(labels('osm'), ['order_summary']);
+});
+
+test('searchIndex matches connection details, ignores blanks and respects the limit', () => {
+  assert.deepEqual(labels('production'), ['Reporting MySQL']);
+  assert.deepEqual(labels('development').sort(), ['Demo · PostgreSQL', 'Demo · SQLite']);
+  assert.deepEqual(labels('   '), []);
+  assert.equal(searchIndex(index, 'o', 2).length, 2);
+  assert.deepEqual(labels('toolkit'), ['toolkit_demo']);
 });
