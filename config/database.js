@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadProjectManifest } from '../lib/manifest.js';
+import { normalizeEngineName } from '../lib/utils.js';
 
 function resolvePath(cwd, value) {
   return path.isAbsolute(value) ? value : path.resolve(cwd, value);
@@ -26,26 +27,13 @@ function resolveEngineFile(cwd, engine, filename, fallbackRelativePath) {
 }
 
 function toPort(value, fallback) {
-  const parsed = Number(value ?? fallback);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeEngineName(value) {
-  switch (String(value || '').trim().toLowerCase()) {
-    case 'postgress':
-    case 'postgresql':
-    case 'postgres':
-      return 'postgres';
-    case 'mysql':
-      return 'mysql';
-    case 'sqlserver':
-    case 'mssql':
-      return 'mssql';
-    case 'sqlite':
-      return 'sqlite';
-    default:
-      return null;
+  // An absent port arrives as '' from the WHATWG URL parser; treat empty/missing
+  // as "use the fallback" rather than letting Number('') collapse to 0.
+  if (value === undefined || value === null || value === '') {
+    return fallback;
   }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function decodeUrlPart(value) {

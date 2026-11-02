@@ -1,230 +1,158 @@
-const token = new URLSearchParams(location.search).get('token') || '';
+import { $, option, api, state, bus, actions, notice, log, fail, selected, endpoint } from './core.js';
+import { initShell, showView } from './shell.js';
+import { initNav, syncProfiles, activateConnection } from './nav.js';
+import { initTree } from './tree.js';
+import { initHeader } from './header.js';
+import { initTabs, renderTabs, renderTab, invalidateTabs, restoreTabLocations } from './tabs.js';
+import { initSearch } from './search.js';
 
-// One positional "arg" field maps to the command's args array; commands take at
-// most one positional today (drop <table>, restore <file>, backup [output], …).
-const COMMANDS = [
-  { name: 'init', label: 'Init', desc: 'Create the database and apply the default schema.' },
-  { name: 'create', label: 'Create', desc: 'Create the database (optionally a schema).' },
-  { name: 'tables', label: 'List Tables', desc: 'Show tables in the active database.' },
-  { name: 'health', label: 'Health Check', desc: 'Run a quick connectivity check.' },
-  { name: 'scan', label: 'Scan Clients', desc: 'Check local CLI tools and engine connection.' },
-  { name: 'migrate', label: 'Migrate', desc: 'Apply pending migration files in order.' },
-  { name: 'seed', label: 'Seed', desc: 'Apply the default seed data.' },
-  { name: 'update', label: 'Update', desc: 'Apply a schema update file.', arg: { label: 'Update SQL file (optional)', placeholder: 'schemas/update_schema.sql' } },
-  { name: 'backup', label: 'Backup', desc: 'Write a backup to the backups folder.', arg: { label: 'Output path (optional)' } },
-  { name: 'set', label: 'Set Engine', desc: 'Write the project manifest for an engine.', arg: { label: 'Engine', placeholder: 'sqlite | postgres | mysql | mssql', required: true } },
-  { name: 'create-env', label: 'Create Env', desc: 'Write .env.example for an engine.', arg: { label: 'Engine', placeholder: 'sqlite | postgres | mysql | mssql', required: true } },
-  { name: 'reset', label: 'Reset', desc: 'Drop all tables and rebuild the schema.', destructive: true },
-  { name: 'drop', label: 'Drop Table', desc: 'Drop one table.', destructive: true, arg: { label: 'Table name', required: true } },
-  { name: 'restore', label: 'Restore', desc: 'Restore from a backup file (overwrites data).', destructive: true, arg: { label: 'Backup file path', required: true } },
-];
+const form = $('connectionForm');
+const fields = form.elements;
 
-let errorCount = 0;
-
-function api(path, options = {}) {
-  return fetch(path, {
-    ...options,
-    headers: { 'content-type': 'application/json', 'x-ui-token': token, ...(options.headers || {}) },
-  }).then(async (res) => {
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `Request failed (${res.status})`);
-    }
-    return data;
-  });
-}
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
-}
-
-/* ---------- tabs ---------- */
-document.getElementById('tabs').addEventListener('click', (event) => {
-  const button = event.target.closest('.tab');
-  if (!button) return;
-  for (const tab of document.querySelectorAll('.tab')) tab.classList.toggle('active', tab === button);
-  const target = button.dataset.tab;
-  for (const panel of document.querySelectorAll('.panel')) panel.classList.toggle('active', panel.id === target);
-  if (target === 'errors') resetErrorBadge();
-});
-
-/* ---------- dashboard ---------- */
-async function loadStatus() {
-  const connectionEl = document.getElementById('connectionStatus');
-  const tablesEl = document.getElementById('tablesList');
-  const migrationsEl = document.getElementById('migrationsStatus');
-  const toolsEl = document.getElementById('toolsStatus');
-  connectionEl.textContent = 'checking…';
-
-  let status;
+async function refreshProfiles() {
+  const version = ++state.profilesVersion;
   try {
-    status = await api('/api/status');
-  } catch (error) {
-    connectionEl.innerHTML = '';
-    connectionEl.append(dot('bad'), document.createTextNode(`status failed: ${error.message}`));
-    return;
-  }
-
-  document.getElementById('enginePill').textContent = `engine: ${status.engine} · ${status.databaseName}`;
-
-  connectionEl.innerHTML = '';
-  if (status.connection?.ok) {
-    connectionEl.append(dot('ok'), document.createTextNode(`connected · ${status.connection.tables ?? 0} tables`));
-  } else {
-    connectionEl.append(dot('bad'), document.createTextNode(status.connection?.error || 'not reachable'));
-  }
-
-  tablesEl.innerHTML = '';
-  if (!status.tables.length) {
-    tablesEl.append(el('li', 'muted', status.tablesError || '(no tables)'));
-  } else {
-    for (const name of status.tables) tablesEl.append(el('li', null, name));
-  }
-
-  migrationsEl.innerHTML = '';
-  const applied = status.migrations.applied.length;
-  const pending = status.migrations.pending.length;
-  migrationsEl.append(dot(pending ? 'warn' : 'ok'));
-  migrationsEl.append(document.createTextNode(`${applied} applied · ${pending} pending`));
-
-  toolsEl.innerHTML = '';
-  for (const tool of status.tools) {
-    const row = el('div');
-    row.append(dot(tool.installed ? 'ok' : 'warn'), document.createTextNode(`${tool.label}: ${tool.installed ? 'found' : 'missing'}`));
-    toolsEl.append(row);
-  }
+    const data = await api('/api/connections');
+    if (version !== state.profilesVersion) return;
+    state.profiles = data.profiles || [];
+    state.capabilities = data.capabilities || {};
+    state.persistence = data.credentialPersistence;
+    state.connected = new Set(state.profiles.filter((profile) => profile.connected).map((profile) => profile.id));
+    state.serverInfo = Object.fromEntries(state.profiles.filter((profile) => profile.serverInfo).map((profile) => [profile.id, profile.serverInfo]));
+    restoreTabLocations();
+    fields.credentialMode.querySelector('[value="saved"]').disabled = data.credentialPersistence !== 'windows-dpapi';
+    if (state.selectedId && !selected()) state.selectedId = null;
+    syncProfiles();
+    invalidateTabs();
+    bus.emit('profiles');
+  } catch (error) { if (version === state.profilesVersion) fail(error, 'Could not load connections'); }
 }
-
-function dot(kind) {
-  const span = el('span', `dot ${kind}`);
-  return span;
-}
-
-/* ---------- commands ---------- */
-function buildCommandCards() {
-  const grid = document.getElementById('commandGrid');
-  for (const command of COMMANDS) {
-    const card = el('div', `command${command.destructive ? ' destructive' : ''}`);
-    card.append(el('h4', null, command.label));
-    card.append(el('div', 'desc', command.desc || ''));
-
-    let input = null;
-    if (command.arg) {
-      input = el('input');
-      input.placeholder = command.arg.placeholder || command.arg.label;
-      card.append(input);
-    }
-
-    const button = el('button', 'run-btn', command.destructive ? 'Run…' : 'Run');
-    button.addEventListener('click', () => {
-      const value = input ? input.value.trim() : '';
-      if (command.arg?.required && !value) {
-        input.focus();
-        return;
-      }
-      const args = value ? [value] : [];
-      if (command.destructive) {
-        confirmAndRun(command, args, value);
-      } else {
-        runCommand(command, args);
-      }
-    });
-    card.append(button);
-    grid.append(card);
-  }
-}
-
-/* ---------- confirm modal ---------- */
-const modal = document.getElementById('modal');
-let pendingConfirm = null;
-
-function confirmAndRun(command, args, value) {
-  document.getElementById('modalTitle').textContent = `Confirm: ${command.label}`;
-  const target = value ? ` "${value}"` : '';
-  document.getElementById('modalBody').textContent =
-    `${command.desc} This affects the active database${target}. This cannot be undone.`;
-  pendingConfirm = () => runCommand(command, args);
-  modal.hidden = false;
-}
-
-document.getElementById('modalCancel').addEventListener('click', () => {
-  modal.hidden = true;
-  pendingConfirm = null;
-});
-document.getElementById('modalConfirm').addEventListener('click', () => {
-  modal.hidden = true;
-  const run = pendingConfirm;
-  pendingConfirm = null;
-  if (run) run();
-});
-
-/* ---------- run + output ---------- */
-async function runCommand(command, args) {
-  const display = `$ db ${command.name}${args.length ? ' ' + args.join(' ') : ''}`;
-  appendLog('cmd', display);
-
-  let result;
+async function toggleConnection(profile) {
+  if (state.pendingConnections.has(profile.id)) return;
+  const disconnect = state.connected.has(profile.id);
+  state.pendingConnections.add(profile.id);
+  bus.emit('tree'); bus.emit('target');
+  notice(`${disconnect ? 'Disconnecting' : 'Connecting'} ${profile.name}…`);
   try {
-    result = await api('/api/run', { method: 'POST', body: JSON.stringify({ command: command.name, args }) });
+    const result = await api(endpoint(profile, disconnect ? 'disconnect' : 'connect'), { revision: profile.revision });
+    if (disconnect) {
+      state.connected.delete(profile.id);
+      delete state.serverInfo[profile.id];
+      invalidateTabs();
+      syncProfiles();
+      notice('Disconnected. Session-only credentials were cleared.');
+    } else {
+      state.connected.add(profile.id);
+      if (result.serverInfo) state.serverInfo[profile.id] = result.serverInfo;
+      showView('workspace');
+      await activateConnection(profile, result.databases);
+      notice(result.discoveryError || `Connected to ${profile.name}.`);
+    }
+    log(`${disconnect ? 'Disconnected from' : 'Connected to'} ${profile.name}.`);
+  } catch (error) { fail(error, disconnect ? 'Disconnect failed' : 'Connection failed'); }
+  finally { state.pendingConnections.delete(profile.id); renderTabs(); renderTab(); bus.emit('profiles'); bus.emit('tree'); bus.emit('target'); }
+}
+async function favorite(profile) {
+  try { await api('/api/connections', { ...profile, favorite: !profile.favorite }); await refreshProfiles(); }
+  catch (error) { fail(error, 'Could not update favorite'); }
+}
+async function deleteConnection(profile) {
+  if (!confirm(`Delete "${profile.name}"? Its open tabs will be disabled. The database itself will not be deleted.`)) return;
+  try {
+    await api(`/api/connections/${encodeURIComponent(profile.id)}`, { revision: profile.revision }, 'DELETE');
+    await refreshProfiles(); notice('Connection removed.'); log('Removed a connection profile.');
+  } catch (error) { fail(error, 'Could not delete connection'); }
+}
+function openConnection(profile = null, duplicate = false) {
+  form.reset();
+  fields.credentialMode.value = state.persistence === 'windows-dpapi' ? 'saved' : 'session';
+  state.editing = duplicate ? null : profile;
+  $('connectionTitle').textContent = profile ? (duplicate ? 'Duplicate connection' : 'Edit connection') : 'Add connection';
+  $('formMessage').textContent = duplicate ? 'The copy has no password. Enter credentials explicitly if it needs them.' : '';
+  $('formMessage').className = '';
+  for (const name of ['name', 'group', 'engine', 'environment', 'credentialMode']) {
+    if (profile?.[name] !== undefined) fields[name].value = profile[name];
+  }
+  if (profile) {
+    for (const name of ['host', 'port', 'user', 'database', 'file', 'sslMode', 'sslCa']) fields[name].value = profile.settings?.[name] ?? (name === 'sslMode' ? 'verify-full' : '');
+    fields.readOnly.checked = profile.readOnly;
+    fields.favorite.checked = profile.favorite;
+  }
+  if (profile && ![...fields.environment.options].some((entry) => entry.value === profile.environment)) {
+    fields.environment.append(option(profile.environment)); fields.environment.value = profile.environment;
+  }
+  if (duplicate) { fields.name.value += ' copy'; fields.credentialMode.value = 'session'; fields.favorite.checked = false; }
+  fields.password.type = 'password';
+  $('showPassword').textContent = 'Show'; $('showPassword').setAttribute('aria-pressed', 'false');
+  $('passwordStatus').textContent = state.editing ? `(${profile.credentialStatus || 'unknown'})` : '';
+  syncConnectionForm();
+  $('connectionDialog').showModal();
+}
+function syncConnectionForm() {
+  const sqlite = fields.engine.value === 'sqlite';
+  const url = fields.entryMode.value === 'url' && !sqlite;
+  $('entryModeLabel').hidden = sqlite;
+  $('urlFields').hidden = !url;
+  $('sqliteFields').hidden = !sqlite;
+  $('serverFields').hidden = sqlite || url;
+  $('credentialFields').hidden = sqlite;
+  $('passwordActionLabel').hidden = !state.editing || url;
+  fields.password.disabled = !!state.editing && fields.passwordAction.value !== 'replace';
+  if (fields.credentialMode.value === 'saved' && state.persistence !== 'windows-dpapi') fields.credentialMode.value = 'session';
+}
+function connectionInput() {
+  const input = { ...(state.editing ? { id: state.editing.id, revision: state.editing.revision } : {}), name: fields.name.value.trim(), engine: fields.engine.value, group: fields.group.value.trim(), environment: fields.environment.value, favorite: fields.favorite.checked, readOnly: fields.readOnly.checked, credentialMode: fields.engine.value === 'sqlite' ? 'none' : fields.credentialMode.value };
+  if (fields.entryMode.value === 'url' && input.engine !== 'sqlite') input.url = fields.url.value.trim();
+  else if (input.engine === 'sqlite') input.settings = { file: fields.file.value.trim() };
+  else {
+    input.settings = {};
+    for (const name of ['host', 'port', 'database', 'user', 'sslMode', 'sslCa']) if (fields[name].value) input.settings[name] = name === 'port' ? Number(fields[name].value) : fields[name].value.trim();
+    if (!state.editing || fields.passwordAction.value === 'replace') input.settings.password = fields.password.value;
+    if (state.editing && fields.passwordAction.value === 'clear') input.settings.password = '';
+  }
+  return input;
+}
+async function submitConnection(test) {
+  if (!form.reportValidity()) return;
+  const controls = [form.querySelector('[type="submit"]'), $('testConnection')];
+  controls.forEach((control) => { control.disabled = true; });
+  $('formMessage').className = '';
+  $('formMessage').textContent = test ? 'Testing connection…' : 'Saving connection…';
+  try {
+    const input = connectionInput();
+    await api(test ? '/api/connections/test' : '/api/connections', test ? { profile: input } : input);
+    if (test) $('formMessage').textContent = 'Connection test succeeded. You can save this profile.';
+    else {
+      $('connectionDialog').close();
+      fields.password.value = ''; fields.url.value = '';
+      await refreshProfiles();
+      notice('Connection saved. Choose Connect when ready.');
+      log('Saved a connection profile.');
+    }
   } catch (error) {
-    appendLog('error', error.message);
-    addError(command.name, error.message);
-    return;
-  }
-
-  for (const entry of result.logs) appendLog(entry.level, entry.message);
-  if (!result.ok) {
-    appendLog('error', result.error || 'Command failed.');
-    addError(command.name, result.error || 'Command failed.');
-  }
-  loadStatus();
+    $('formMessage').textContent = error.message;
+    $('formMessage').className = 'error';
+    // Form errors intentionally stay out of logs: unsaved values can include secrets.
+  } finally { controls.forEach((control) => { control.disabled = false; }); }
 }
-
-function appendLog(level, message) {
-  const consoleEl = document.getElementById('logConsole');
-  const placeholder = consoleEl.querySelector('.muted');
-  if (placeholder) placeholder.remove();
-  const line = el('div', `line ${level}`, message);
-  consoleEl.append(line);
-  consoleEl.scrollTop = consoleEl.scrollHeight;
-}
-
-function addError(command, message) {
-  const list = document.getElementById('errorList');
-  const placeholder = list.querySelector('.muted');
-  if (placeholder) placeholder.remove();
-  const entry = el('div', 'error-entry');
-  entry.append(el('div', 'cmd', `db ${command}`));
-  entry.append(el('div', 'msg', message));
-  entry.append(el('div', 'time', new Date().toLocaleTimeString()));
-  list.prepend(entry);
-  bumpErrorBadge();
-}
-
-function bumpErrorBadge() {
-  errorCount += 1;
-  const badge = document.getElementById('errorBadge');
-  badge.textContent = String(errorCount);
-  badge.hidden = false;
-}
-
-function resetErrorBadge() {
-  errorCount = 0;
-  document.getElementById('errorBadge').hidden = true;
-}
-
-document.getElementById('refreshBtn').addEventListener('click', loadStatus);
-document.getElementById('clearLogsBtn').addEventListener('click', () => {
-  document.getElementById('logConsole').innerHTML = '<span class="muted">Cleared.</span>';
-});
-document.getElementById('clearErrorsBtn').addEventListener('click', () => {
-  document.getElementById('errorList').innerHTML = '<p class="muted">No errors.</p>';
-  resetErrorBadge();
-});
-
-/* ---------- init ---------- */
-buildCommandCards();
-loadStatus();
+$('closeConnection').addEventListener('click', () => $('connectionDialog').close());
+$('connectionDialog').addEventListener('close', () => { fields.password.value = ''; fields.url.value = ''; });
+$('clearLogs').addEventListener('click', () => { $('logConsole').replaceChildren(); state.errors = 0; $('errorCount').textContent = ''; });
+for (const name of ['engine', 'entryMode', 'credentialMode', 'passwordAction']) fields[name].addEventListener('change', syncConnectionForm);
+$('showPassword').addEventListener('click', () => { const show = fields.password.type === 'password'; fields.password.type = show ? 'text' : 'password'; $('showPassword').textContent = show ? 'Hide' : 'Show'; $('showPassword').setAttribute('aria-pressed', String(show)); });
+$('testConnection').addEventListener('click', () => submitConnection(true));
+form.addEventListener('submit', (event) => { event.preventDefault(); submitConnection(false); });
+$('addConnection').addEventListener('click', () => openConnection());
+$('addConnectionSmall').addEventListener('click', () => openConnection());
+actions.refreshProfiles = refreshProfiles;
+actions.openConnection = openConnection;
+actions.toggleConnection = toggleConnection;
+actions.favorite = favorite;
+actions.deleteConnection = deleteConnection;
+actions.importCurrent = async () => {
+  if (!confirm('Add the project’s current configuration as a saved connection? This explicitly reads its configuration. It will not connect automatically.')) return;
+  try { await api('/api/connections/import-current', {}); await refreshProfiles(); notice('Current configuration added. Select it and choose Connect when ready.'); }
+  catch (error) { fail(error, 'Configuration import failed'); }
+};
+initShell(); initNav(); initTabs(); initTree(); initHeader(); initSearch();
+renderTabs(); renderTab(); refreshProfiles();

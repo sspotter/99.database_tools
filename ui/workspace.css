@@ -1,0 +1,124 @@
+/* ---- layout: main is a flex column so the grid fills the height and the footer stays visible ---- */
+main{display:flex;flex-direction:column;overflow:hidden;padding:0 20px}
+#workspaceView{flex:1;min-height:0;display:flex;flex-direction:column}
+#dashboardView,#logsView,#settingsView{flex:1;min-height:0;overflow:auto;padding-bottom:20px}
+.app-shell.with-inspector{grid-template-columns:var(--sidebar-w) minmax(0,1fr) var(--inspector-w)}
+.app-shell.sidebar-collapsed.with-inspector{grid-template-columns:minmax(0,1fr) var(--inspector-w)}
+.tab-content{flex:1;min-height:0;display:flex;flex-direction:column}
+.tab-region{flex:1;min-height:0;overflow:auto;position:relative}
+.tab-region.is-busy .data-table-wrap{opacity:.55;transition:opacity .15s}
+.loading{padding:18px 4px}
+.empty-state{margin:10vh auto 0}
+
+/* ---- tabs ---- */
+.workspace-tabs{display:flex;align-items:stretch;gap:4px;overflow-x:auto;padding-top:12px;border-bottom:1px solid var(--border);min-height:52px;flex:none}
+.tab-item{display:flex;align-items:center;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;flex:none;max-width:270px}
+.tab-item:hover{background:var(--row-hover)}
+.tab-item.active{background:var(--card);border-color:var(--border);box-shadow:inset 0 2px 0 var(--accent)}
+.tab-item.unavailable .tab-title{text-decoration:line-through;opacity:.7}
+.tab-select{display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:9px 4px 9px 12px;font-size:13px;max-width:210px}
+.tab-select:hover{background:transparent}
+.tab-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab-env{font-size:9px;font-weight:800;color:var(--err);border:1px solid var(--err);border-radius:4px;padding:0 4px}
+.close-tab{width:24px;height:24px;margin-right:6px}
+.tab-add{border:0;background:transparent;font-size:20px;line-height:1;padding:6px 12px;color:var(--muted);align-self:center}
+.tab-add:hover{color:var(--text);background:var(--card)}
+
+/* ---- toolbar ---- */
+.tab-toolbar{display:flex;align-items:center;gap:8px;padding:12px 0;flex-wrap:wrap;flex:none}
+.toolbar-sep{width:1px;height:22px;background:var(--border);margin:0 4px}
+.toolbar-spacer{flex:1}
+.segmented{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:0;background:var(--panel);padding:7px 12px}
+.seg+.seg{border-left:1px solid var(--border)}
+.seg.active{background:#14305c;color:var(--accent-text);box-shadow:inset 0 0 0 1px var(--accent)}
+.tool{display:inline-flex;align-items:center;gap:7px;background:var(--panel)}
+.tool.active{border-color:var(--accent-text);color:var(--accent-text)}
+.tool>span{max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.tool.icon-only{padding:7px 9px}
+.tool-run{display:inline-flex;align-items:center;gap:7px}
+.filter-form{display:grid;gap:10px;padding:8px;min-width:260px}
+.filter-form label{display:grid;gap:5px;font-size:12px;color:var(--muted)}
+.filter-form label.check{display:flex;align-items:center;gap:8px;color:var(--text)}
+.filter-form input[type=checkbox]{width:auto}
+.filter-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* ---- grid ---- */
+.data-table-wrap{border:1px solid var(--border);border-radius:8px;background:var(--panel);overflow:auto;max-height:100%}
+.data-table{border-collapse:separate;border-spacing:0;min-width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.data-table th,.data-table td{padding:10px 14px;white-space:nowrap;text-align:left;border-bottom:1px solid var(--border);max-width:420px;overflow:hidden;text-overflow:ellipsis}
+.data-table th+th,.data-table td+td{border-left:1px solid var(--border)}
+.data-table th{position:sticky;top:0;z-index:1;background:#101b2e;font-weight:600}
+.data-table tbody tr{cursor:default}
+.data-table tbody tr:hover td{background:var(--row-hover)}
+.data-table tbody tr.selected td{background:var(--row-selected)}
+.data-table .num{text-align:right}
+.sort-button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:0;color:inherit;font:inherit;font-weight:600}
+.sort-button:hover{background:transparent;color:var(--accent-text)}
+.sort-ind{color:var(--muted);font-size:11px}
+th[aria-sort] .sort-ind{color:var(--accent-text)}
+.th-keys{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
+.th-keys .icon{width:12px;height:12px;color:var(--warn)}
+.null-cell{color:var(--muted);font-style:italic}
+.pill{display:inline-block;padding:2px 10px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid transparent}
+.pill.ok{background:#12351f;color:#7ee2a0;border-color:#1d5a35}
+.pill.warn{background:#3a2d0d;color:#f5c860;border-color:#6a5113}
+.pill.info{background:#102f57;color:#7db4ff;border-color:#1d4f8f}
+.pill.bad{background:#401918;color:#ff9a92;border-color:#7a2b28}
+.pill.a{background:#2b1f4a;color:#b9a2ff;border-color:#4b3a85}
+.pill.b{background:#0e3a3a;color:#6fe0d6;border-color:#1c6767}
+.pill.c{background:#2a3446;color:#b7c4d9;border-color:#445572}
+
+/* ---- footer / pagination ---- */
+.tab-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 2px 8px;flex-wrap:wrap;color:var(--muted);font-size:13px;flex:none}
+.pager{display:flex;align-items:center;gap:6px}
+.pager button{min-width:34px;padding:6px 10px}
+.pager button[aria-current="page"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.pager .gap{padding:0 4px}
+.pager .pager-sep{width:1px;height:24px;background:var(--border);margin:0 6px}
+.pager select{width:auto}
+
+/* ---- inspector (Table details) ---- */
+.inspector-panel{background:var(--panel);border-left:1px solid var(--border);overflow:auto;padding:18px 18px 24px;min-width:0}
+.inspector-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.inspector-head h2{font-size:18px;margin:0}
+.insp-title{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;margin:6px 0 14px;overflow-wrap:anywhere}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;margin:0 0 12px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.insp-section{border-top:1px solid var(--border);padding:14px 0}
+.insp-section h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px}
+.insp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;font-size:13px}
+.insp-row .name{display:flex;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere}
+.insp-cols{color:var(--muted);font-size:12px;padding:0 0 6px 24px;overflow-wrap:anywhere}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:5px;background:var(--card);font-size:11px;white-space:nowrap}
+.tag{color:var(--muted);font-size:12px;white-space:nowrap}
+.insp-def pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6;background:var(--bg);padding:10px;border-radius:6px;margin:8px 0 0}
+
+/* ---- structure view ---- */
+.structure{overflow:auto;display:grid;gap:22px;padding-bottom:12px}
+.structure h3{margin:0 0 8px;font-size:15px}
+.struct-table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.struct-table th,.struct-table td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+.struct-table th{background:#101b2e;font-weight:600}
+.struct-table tr:last-child td{border-bottom:0}
+
+/* ---- SQL tab ---- */
+.sql-editor{flex:none;min-height:150px;max-height:40vh;background:var(--panel)}
+.history{flex:none;margin-top:10px;max-height:30vh;overflow:auto}
+.history-row{display:flex;gap:10px;align-items:baseline;padding:3px 0}
+.history-row button{border:0;background:transparent;padding:2px 0;text-align:left;font-family:ui-monospace,"Cascadia Code",monospace;font-size:12px;white-space:normal;overflow-wrap:anywhere}
+
+/* ---- responsive ---- */
+@media(max-width:1200px){
+  .app-shell.with-inspector{grid-template-columns:var(--sidebar-w) minmax(0,1fr)}
+  .app-shell.sidebar-collapsed.with-inspector{grid-template-columns:minmax(0,1fr)}
+  .inspector-panel{position:fixed;z-index:35;top:var(--topbar-h);bottom:var(--statusbar-h);right:0;width:min(360px,92vw);box-shadow:-16px 0 40px #0009}
+}
+@media(max-width:680px){
+  main{padding:0 12px}
+  .tab-toolbar .toolbar-spacer{display:none}
+  .tool>span{max-width:130px}
+  .tab-footer{justify-content:center}
+  .data-table th,.data-table td{padding:8px 10px}
+}

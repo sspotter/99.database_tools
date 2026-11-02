@@ -25,7 +25,6 @@ node db.js backup
 node db.js restore backups/example.db
 node db.js health
 node db.js seed
-node db.js rollback
 node db.js set postgres
 node db.js set postgres --url
 ```
@@ -58,7 +57,7 @@ What it does:
 Expected output:
 - `Database ready: ...`
 - `Initialized from ...`
-- If a required client is missing, a warning and install prompt.
+- If a required native client is missing, the operation fails with installation instructions.
 
 ## List Tables
 
@@ -100,8 +99,8 @@ Example:
 Tool scan results:
 - PostgreSQL engine: connected via pg driver (localhost:5432/gdfsg)
 - SQLite CLI: found at C:\path\to\sqlite3.exe
-- PostgreSQL CLI: not installed (optional; this project uses the pg driver)
-- MySQL CLI: missing
+- PostgreSQL CLI: not installed (driver operations work; backup requires pg_dump and restore requires psql)
+- MySQL client: missing
 ```
 
 ## Install Clients
@@ -155,11 +154,17 @@ node db.js migrate
 What it does:
 - Scans the migrations folder.
 - Applies pending `.sql` files in filename order.
-- Records each migration in `schema_migrations`.
+- Coordinates SQLite write locks, PostgreSQL advisory locks, or MySQL `GET_LOCK` before applying migrations.
+- Commits SQLite/PostgreSQL SQL and ledger writes together; stores new checksums in `schema_migration_checksums`.
+- Skips legacy ledger rows with an unverified warning; rejects changed applied files with recorded checksums.
+- MySQL tracks durable attempts and blocks automatic retry after failed/interrupted work until manual repair; SQL Server migrations are unsupported.
 
 Expected output:
 - `Applied migration: 001_initial_schema.sql`
 - Or `No pending migrations found.`
+
+Migration files must omit outer transaction wrappers, top-level `SET` statements, and client directives.
+See [migration restrictions and manual repair](docs/usage.md#cli-migrations).
 
 ## Backup Database
 
@@ -169,6 +174,9 @@ node db.js backup
 
 What it does:
 - Creates a backup file in the configured backup directory.
+- SQLite creates an integrity-checked snapshot including committed WAL pages.
+- PostgreSQL/MySQL stream native dumps and publish only after success. Existing output files are refused.
+- Requires `pg_dump` for PostgreSQL or `mysqldump` for MySQL. MySQL transactional consistency excludes concurrent DDL/nontransactional-table writes; SQL Server backup is unsupported.
 
 Expected output:
 - `Backup written to ...`
@@ -180,10 +188,15 @@ node db.js restore backups/example.db
 ```
 
 What it does:
-- Restores a database from a backup file.
+- SQLite validates input and stages replacement; stop external users first. Busy/recovery state and same-file aliases are refused.
+- PostgreSQL restores trusted plain dumps through `psql`, requires an empty target, and rolls back SQL failure in a single transaction.
+- MySQL streams through `mysql`; failure may leave committed changes. SQL Server restore is unsupported.
 
 Expected output:
 - `Restore completed from ...`
+
+See [restore maintenance and recovery](docs/usage.md#cli-backup-and-restore)
+before replacing a SQLite target or restoring a server dump.
 
 ## Reset Database
 
